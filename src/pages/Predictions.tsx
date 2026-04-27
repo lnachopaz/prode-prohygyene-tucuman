@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { flagUrl } from "@/lib/flags";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -249,11 +250,12 @@ function MatchCard({
 }
 
 function TeamSide({ name, flag, align }: { name: string; flag: string | null; align: "start" | "end" }) {
+  const src = flag || flagUrl(name);
   return (
     <div className={`flex items-center gap-2 min-w-0 ${align === "end" ? "justify-end" : "justify-start"}`}>
       {align === "end" && <span className="font-semibold truncate">{name}</span>}
-      {flag ? (
-        <img src={flag} alt={name} className="h-7 w-7 rounded-full object-cover bg-muted flex-shrink-0" />
+      {src ? (
+        <img src={src} alt={name} className="h-7 w-7 rounded-full object-cover bg-muted flex-shrink-0" />
       ) : (
         <div className="h-7 w-7 rounded-full bg-muted flex-shrink-0" />
       )}
