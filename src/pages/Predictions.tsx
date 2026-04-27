@@ -6,7 +6,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, Lock } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Save, Lock, X } from "lucide-react";
 import { toast } from "sonner";
 import { format, isAfter, subMinutes } from "date-fns";
 import { es } from "date-fns/locale";
@@ -68,17 +75,65 @@ export default function Predictions() {
     return m;
   }, [preds]);
 
-  const grouped = useMemo(() => {
+  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [groupFilter, setGroupFilter] = useState<string>("all");
+  const [teamFilter, setTeamFilter] = useState<string>("");
+  const [predStatusFilter, setPredStatusFilter] = useState<string>("all");
+
+  const stages = useMemo(() => {
+    const s = new Set<string>();
+    matches?.forEach((m) => s.add(m.stage));
+    return Array.from(s);
+  }, [matches]);
+
+  const groups = useMemo(() => {
+    const s = new Set<string>();
+    matches?.forEach((m) => m.group_name && s.add(m.group_name));
+    return Array.from(s).sort();
+  }, [matches]);
+
+  const filtered = useMemo(() => {
     if (!matches) return [];
+    const now = new Date();
+    const term = teamFilter.trim().toLowerCase();
+    return matches.filter((m) => {
+      if (stageFilter !== "all" && m.stage !== stageFilter) return false;
+      if (groupFilter !== "all" && m.group_name !== groupFilter) return false;
+      if (term && !m.team_a.toLowerCase().includes(term) && !m.team_b.toLowerCase().includes(term)) return false;
+      if (predStatusFilter !== "all") {
+        const p = predMap.get(m.id);
+        const lockAt = subMinutes(new Date(m.kickoff_at), 5);
+        const locked = !isAfter(lockAt, now) || m.status !== "scheduled";
+        if (predStatusFilter === "loaded" && !p) return false;
+        if (predStatusFilter === "missing" && p) return false;
+        if (predStatusFilter === "open" && locked) return false;
+        if (predStatusFilter === "locked" && !locked) return false;
+        if (predStatusFilter === "finished" && m.status !== "finished") return false;
+      }
+      return true;
+    });
+  }, [matches, stageFilter, groupFilter, teamFilter, predStatusFilter, predMap]);
+
+  const grouped = useMemo(() => {
     const byDate = new Map<string, Match[]>();
-    matches.forEach((m) => {
+    filtered.forEach((m) => {
       const key = format(new Date(m.kickoff_at), "yyyy-MM-dd");
       const arr = byDate.get(key) ?? [];
       arr.push(m);
       byDate.set(key, arr);
     });
     return Array.from(byDate.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [matches]);
+  }, [filtered]);
+
+  const hasActiveFilters =
+    stageFilter !== "all" || groupFilter !== "all" || teamFilter !== "" || predStatusFilter !== "all";
+
+  function clearFilters() {
+    setStageFilter("all");
+    setGroupFilter("all");
+    setTeamFilter("");
+    setPredStatusFilter("all");
+  }
 
   if (isLoading) {
     return (
@@ -104,30 +159,83 @@ export default function Predictions() {
         <p className="text-muted-foreground">Cargá tus marcadores antes del cierre (5 min antes del partido).</p>
       </div>
 
-      {grouped.map(([date, dayMatches]) => (
-        <section key={date} className="space-y-3">
-          <h2 className="text-lg font-semibold capitalize text-muted-foreground">
-            {format(new Date(date), "EEEE d 'de' MMMM yyyy", { locale: es })}
-          </h2>
-          <div className="grid gap-3 md:grid-cols-2">
-            {dayMatches.map((m) => {
-              const matchWithFlags = {
-                ...m,
-                team_a_flag: getCountryFlagUrl(m.team_a) ?? m.team_a_flag,
-                team_b_flag: getCountryFlagUrl(m.team_b) ?? m.team_b_flag,
-              };
-              return (
-                <MatchCard
-                  key={m.id}
-                  match={matchWithFlags}
-                  prediction={predMap.get(m.id)}
-                  onSaved={() => qc.invalidateQueries({ queryKey: ["my-preds"] })}
-                />
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      <div className="flex flex-wrap gap-2 items-center">
+        <Select value={stageFilter} onValueChange={setStageFilter}>
+          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Etapa" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las etapas</SelectItem>
+            {stages.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        <Select value={groupFilter} onValueChange={setGroupFilter}>
+          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Grupo" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los grupos</SelectItem>
+            {groups.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        <Select value={predStatusFilter} onValueChange={setPredStatusFilter}>
+          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Estado" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="loaded">Pronóstico cargado</SelectItem>
+            <SelectItem value="missing">Sin pronóstico</SelectItem>
+            <SelectItem value="open">Abiertos</SelectItem>
+            <SelectItem value="locked">Cerrados</SelectItem>
+            <SelectItem value="finished">Finalizados</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Input
+          placeholder="Buscar equipo..."
+          value={teamFilter}
+          onChange={(e) => setTeamFilter(e.target.value)}
+          className="w-[200px]"
+        />
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="h-4 w-4 mr-1" /> Limpiar
+          </Button>
+        )}
+
+        <span className="text-sm text-muted-foreground ml-auto">
+          {filtered.length} {filtered.length === 1 ? "partido" : "partidos"}
+        </span>
+      </div>
+
+      {grouped.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          No hay partidos que coincidan con los filtros.
+        </div>
+      ) : (
+        grouped.map(([date, dayMatches]) => (
+          <section key={date} className="space-y-3">
+            <h2 className="text-lg font-semibold capitalize text-muted-foreground">
+              {format(new Date(date), "EEEE d 'de' MMMM yyyy", { locale: es })}
+            </h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              {dayMatches.map((m) => {
+                const matchWithFlags = {
+                  ...m,
+                  team_a_flag: getCountryFlagUrl(m.team_a) ?? m.team_a_flag,
+                  team_b_flag: getCountryFlagUrl(m.team_b) ?? m.team_b_flag,
+                };
+                return (
+                  <MatchCard
+                    key={m.id}
+                    match={matchWithFlags}
+                    prediction={predMap.get(m.id)}
+                    onSaved={() => qc.invalidateQueries({ queryKey: ["my-preds"] })}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        ))
+      )}
     </div>
   );
 }
