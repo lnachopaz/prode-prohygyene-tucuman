@@ -228,18 +228,60 @@ function UsersAdmin() {
     qc.invalidateQueries({ queryKey: ["admin-users"] });
   }
 
+  async function setStatus(userId: string, status: "approved" | "rejected" | "pending") {
+    const { error } = await supabase.from("profiles").update({ status }).eq("id", userId);
+    if (error) return toast.error(error.message);
+    toast.success(status === "approved" ? "Usuario aprobado" : status === "rejected" ? "Usuario rechazado" : "Marcado como pendiente");
+    qc.invalidateQueries({ queryKey: ["admin-users"] });
+  }
+
   if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-primary" />;
 
+  const pending = users?.filter((u: any) => u.status === "pending") ?? [];
+  const others = users?.filter((u: any) => u.status !== "pending") ?? [];
+
   return (
-    <div className="space-y-2">
-      {users?.map((u) => (
-        <UserRow key={u.id} user={u} onRename={(n) => rename(u.id, n)} onToggleAdmin={() => toggleAdmin(u.id, !u.is_admin)} />
-      ))}
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          Pendientes de aprobación
+          {pending.length > 0 && <Badge>{pending.length}</Badge>}
+        </h2>
+        {pending.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No hay solicitudes pendientes.</p>
+        ) : (
+          pending.map((u: any) => (
+            <Card key={u.id}>
+              <CardContent className="p-3 flex flex-wrap items-center gap-2">
+                <div className="flex-1 min-w-[180px]">
+                  <p className="font-medium">{u.display_name}</p>
+                  <p className="text-xs text-muted-foreground">Solicitado: {format(new Date(u.created_at), "dd/MM/yyyy HH:mm")}</p>
+                </div>
+                <Button size="sm" onClick={() => setStatus(u.id, "approved")}>Aprobar</Button>
+                <Button size="sm" variant="destructive" onClick={() => setStatus(u.id, "rejected")}>Rechazar</Button>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold">Usuarios</h2>
+        {others.map((u: any) => (
+          <UserRow
+            key={u.id}
+            user={u}
+            onRename={(n: string) => rename(u.id, n)}
+            onToggleAdmin={() => toggleAdmin(u.id, !u.is_admin)}
+            onReject={() => setStatus(u.id, "rejected")}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
-function UserRow({ user, onRename, onToggleAdmin }: any) {
+function UserRow({ user, onRename, onToggleAdmin, onReject }: any) {
   const [name, setName] = useState(user.display_name);
   return (
     <Card>
@@ -247,9 +289,13 @@ function UserRow({ user, onRename, onToggleAdmin }: any) {
         <Input className="flex-1 min-w-[180px]" value={name} onChange={(e) => setName(e.target.value)} />
         <Button size="sm" variant="outline" onClick={() => onRename(name)}>Guardar</Button>
         {user.is_admin && <Badge>Admin</Badge>}
+        {user.status === "rejected" && <Badge variant="destructive">Rechazado</Badge>}
         <Button size="sm" variant={user.is_admin ? "destructive" : "default"} onClick={onToggleAdmin}>
           {user.is_admin ? "Quitar admin" : "Hacer admin"}
         </Button>
+        {user.status === "approved" && !user.is_admin && (
+          <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
+        )}
       </CardContent>
     </Card>
   );
