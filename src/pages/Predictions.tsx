@@ -193,11 +193,16 @@ function MatchCard({
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-4 space-y-3">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className="font-medium">
-            {match.stage}
-            {match.group_name ? ` · ${match.group_name}` : ""}
-          </span>
+        <div className="flex items-start justify-between gap-2 text-xs text-muted-foreground">
+          <div className="min-w-0">
+            <div className="font-medium">
+              {match.stage}
+              {match.group_name ? ` · ${match.group_name}` : ""}
+            </div>
+            {match.venue && (
+              <div className="truncate text-[11px] opacity-80">{match.venue}</div>
+            )}
+          </div>
           {statusBadge()}
         </div>
 
