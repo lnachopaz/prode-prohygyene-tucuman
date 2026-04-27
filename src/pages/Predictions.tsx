@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Save, Lock } from "lucide-react";
 import { toast } from "sonner";
-import { format, isAfter, subMinutes } from "date-fns";
-import { es } from "date-fns/locale";
+import { isAfter, subMinutes } from "date-fns";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
+import { formatLocalTime, localDateKey, formatLocalDateHeading } from "@/lib/matchTime";
 
 type Match = {
   id: string;
@@ -21,6 +21,8 @@ type Match = {
   team_a_flag: string | null;
   team_b_flag: string | null;
   kickoff_at: string;
+  venue: string | null;
+  venue_tz: string | null;
   status: "scheduled" | "live" | "finished";
   score_a: number | null;
   score_b: number | null;
