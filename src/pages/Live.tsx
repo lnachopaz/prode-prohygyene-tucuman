@@ -1,13 +1,41 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Radio, Clock, Trophy } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, Radio, Clock, Trophy, RefreshCw } from "lucide-react";
 import { format, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { Countdown } from "@/components/Countdown";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export default function Live() {
+  const queryClient = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+
+  const syncLive = async (silent = false) => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-live-matches");
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ["live-match"] });
+      if (!silent) toast.success(`Marcadores actualizados (${data?.updated ?? 0})`);
+    } catch (e: any) {
+      if (!silent) toast.error("Error sincronizando: " + (e?.message ?? "desconocido"));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Auto-sync al montar y cada 30s
+  useEffect(() => {
+    syncLive(true);
+    const id = setInterval(() => syncLive(true), 30_000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Match en vivo: status=live, o si no hay, el próximo
   const { data: liveMatch, isLoading } = useQuery({
     queryKey: ["live-match"],
@@ -90,11 +118,17 @@ export default function Live() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Radio className="h-7 w-7 text-primary" /> Live
-        </h1>
-        <p className="text-muted-foreground">Seguí el partido en vivo y los pronósticos del grupo.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Radio className="h-7 w-7 text-primary" /> Live
+          </h1>
+          <p className="text-muted-foreground">Seguí el partido en vivo y los pronósticos del grupo.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => syncLive(false)} disabled={syncing}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+          Actualizar
+        </Button>
       </div>
 
       {/* Match card */}
@@ -109,8 +143,11 @@ export default function Live() {
         </div>
         <CardContent className="p-6">
           <div className="grid grid-cols-3 items-center gap-4">
-            <div className="text-center">
-              <div className="text-lg md:text-xl font-bold">{m.team_a}</div>
+            <div className="text-center flex flex-col items-center gap-2">
+              {m.team_a_flag && (
+                <img src={m.team_a_flag} alt={m.team_a} className="h-12 w-12 md:h-16 md:w-16 object-contain" />
+              )}
+              <div className="text-sm md:text-xl font-bold">{m.team_a}</div>
             </div>
             <div className="text-center">
               {liveMatch.isLive || m.score_a !== null ? (
@@ -124,8 +161,11 @@ export default function Live() {
                 {format(new Date(m.kickoff_at), "dd MMM · HH:mm", { locale: es })}
               </div>
             </div>
-            <div className="text-center">
-              <div className="text-lg md:text-xl font-bold">{m.team_b}</div>
+            <div className="text-center flex flex-col items-center gap-2">
+              {m.team_b_flag && (
+                <img src={m.team_b_flag} alt={m.team_b} className="h-12 w-12 md:h-16 md:w-16 object-contain" />
+              )}
+              <div className="text-sm md:text-xl font-bold">{m.team_b}</div>
             </div>
           </div>
 
