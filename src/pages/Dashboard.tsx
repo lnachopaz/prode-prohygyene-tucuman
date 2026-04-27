@@ -5,7 +5,8 @@ import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, ListChecks, Calendar, Target, TrendingUp, Loader2 } from "lucide-react";
+import { Trophy, ListChecks, Calendar, Target, TrendingUp, Loader2, Radio } from "lucide-react";
+import { Countdown } from "@/components/Countdown";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -74,6 +75,24 @@ export default function Dashboard() {
           <Link to="/predictions"><ListChecks className="h-4 w-4 mr-2" />Cargar pronósticos</Link>
         </Button>
       </div>
+
+      {/* Countdown next match */}
+      {nextMatches && nextMatches[0] && (
+        <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
+          <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-xs uppercase tracking-wider text-primary font-semibold mb-1 flex items-center gap-1">
+                <Radio className="h-3 w-3" /> Próximo partido
+              </div>
+              <div className="text-lg font-bold truncate">{nextMatches[0].team_a} vs {nextMatches[0].team_b}</div>
+              <div className="text-xs text-muted-foreground">
+                {format(new Date(nextMatches[0].kickoff_at), "EEEE dd MMM · HH:mm 'hs'", { locale: es })}
+              </div>
+            </div>
+            <Countdown to={nextMatches[0].kickoff_at} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
