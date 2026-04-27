@@ -186,7 +186,11 @@ export default function Live() {
                   <div className="text-xs text-muted-foreground">
                     {format(new Date(u.kickoff_at), "EEE dd MMM · HH:mm", { locale: es })}
                   </div>
-                  <div className="text-sm font-medium truncate">{u.team_a} vs {u.team_b}</div>
+                  <div className="text-sm font-medium truncate flex items-center gap-2">
+                    <Flag name={u.team_a} size="sm" />
+                    {u.team_a} vs {u.team_b}
+                    <Flag name={u.team_b} size="sm" />
+                  </div>
                 </div>
               </div>
             ))}
