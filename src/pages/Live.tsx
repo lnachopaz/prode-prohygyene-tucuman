@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Radio, Clock, Trophy } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import { es } from "date-fns/locale";
-import { es } from "date-fns/locale";
 import { Countdown } from "@/components/Countdown";
 
 export default function Live() {
