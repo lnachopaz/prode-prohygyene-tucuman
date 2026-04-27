@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Trophy, ListChecks, Shield, LogOut, Moon, Sun, User as UserIcon } from "lucide-react";
+import { Trophy, ListChecks, Shield, LogOut, Moon, Sun, User as UserIcon, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/prohygiene-logo.png";
 import { useAuth, signOut } from "@/lib/auth";
@@ -38,6 +38,9 @@ export default function AppLayout() {
 
           <nav className="hidden md:flex items-center gap-1">
             <NavLink to="/" end className={({ isActive }) => navItem(isActive)}>
+              <LayoutDashboard className="h-4 w-4" /> Resumen
+            </NavLink>
+            <NavLink to="/predictions" className={({ isActive }) => navItem(isActive)}>
               <ListChecks className="h-4 w-4" /> Pronósticos
             </NavLink>
             <NavLink to="/ranking" className={({ isActive }) => navItem(isActive)}>
@@ -68,6 +71,9 @@ export default function AppLayout() {
         {/* Mobile nav */}
         <nav className="md:hidden border-t flex justify-around py-2">
           <NavLink to="/" end className={({ isActive }) => navItem(isActive)}>
+            <LayoutDashboard className="h-4 w-4" />
+          </NavLink>
+          <NavLink to="/predictions" className={({ isActive }) => navItem(isActive)}>
             <ListChecks className="h-4 w-4" />
           </NavLink>
           <NavLink to="/ranking" className={({ isActive }) => navItem(isActive)}>

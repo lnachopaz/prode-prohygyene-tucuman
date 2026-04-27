@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import AppLayout from "./components/AppLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Auth from "./pages/Auth";
+import Dashboard from "./pages/Dashboard";
 import Predictions from "./pages/Predictions";
 import Ranking from "./pages/Ranking";
 import Profile from "./pages/Profile";
@@ -23,7 +24,8 @@ const App = () => (
         <Routes>
           <Route path="/auth" element={<Auth />} />
           <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-            <Route path="/" element={<Predictions />} />
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/predictions" element={<Predictions />} />
             <Route path="/ranking" element={<Ranking />} />
             <Route path="/profile" element={<Profile />} />
             <Route
