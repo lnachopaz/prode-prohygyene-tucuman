@@ -1,13 +1,41 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Radio, Clock, Trophy } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, Radio, Clock, Trophy, RefreshCw } from "lucide-react";
 import { format, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { Countdown } from "@/components/Countdown";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export default function Live() {
+  const queryClient = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+
+  const syncLive = async (silent = false) => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-live-matches");
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ["live-match"] });
+      if (!silent) toast.success(`Marcadores actualizados (${data?.updated ?? 0})`);
+    } catch (e: any) {
+      if (!silent) toast.error("Error sincronizando: " + (e?.message ?? "desconocido"));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Auto-sync al montar y cada 30s
+  useEffect(() => {
+    syncLive(true);
+    const id = setInterval(() => syncLive(true), 30_000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Match en vivo: status=live, o si no hay, el próximo
   const { data: liveMatch, isLoading } = useQuery({
     queryKey: ["live-match"],
