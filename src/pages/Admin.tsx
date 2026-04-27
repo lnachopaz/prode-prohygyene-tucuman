@@ -36,7 +36,7 @@ export default function Admin() {
 
 function MatchesAdmin() {
   const qc = useQueryClient();
-  const [syncing, setSyncing] = useState(false);
+  
   const { data: matches, isLoading } = useQuery({
     queryKey: ["admin-matches"],
     queryFn: async () => {
