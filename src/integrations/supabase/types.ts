@@ -51,6 +51,8 @@ export type Database = {
           team_b: string
           team_b_flag: string | null
           updated_at: string
+          venue: string | null
+          venue_tz: string | null
         }
         Insert: {
           created_at?: string
@@ -67,6 +69,8 @@ export type Database = {
           team_b: string
           team_b_flag?: string | null
           updated_at?: string
+          venue?: string | null
+          venue_tz?: string | null
         }
         Update: {
           created_at?: string
@@ -83,6 +87,8 @@ export type Database = {
           team_b?: string
           team_b_flag?: string | null
           updated_at?: string
+          venue?: string | null
+          venue_tz?: string | null
         }
         Relationships: []
       }
