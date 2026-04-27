@@ -235,12 +235,6 @@ const NAME_TO_ISO: Record<string, string> = {
   "túnez": "tn",
   "tunez": "tn",
   "uzbekistán": "uz",
-  "argentina": "ar",
-  "brasil": "br",
-  "colombia": "co",
-  "ecuador": "ec",
-  "ghana": "gh",
-  "portugal": "pt",
 };
 
 export function getCountryFlagUrl(name: string | null | undefined): string | null {
