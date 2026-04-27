@@ -182,7 +182,7 @@ export default function Live() {
               <div key={u.id} className="flex items-center justify-between py-2 border-b last:border-0">
                 <div className="min-w-0">
                   <div className="text-xs text-muted-foreground">
-                    {format(new Date(u.kickoff_at), "EEE dd MMM · HH:mm", { locale: es })}
+                    {formatInTimeZone(u.kickoff_at, u.venue_tz || "America/Mexico_City", "EEE dd MMM · HH:mm", { locale: es })}
                   </div>
                   <div className="text-sm font-medium truncate">{u.team_a} vs {u.team_b}</div>
                 </div>
