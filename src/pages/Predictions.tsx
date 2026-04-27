@@ -74,7 +74,7 @@ export default function Predictions() {
     if (!matches) return [];
     const byDate = new Map<string, Match[]>();
     matches.forEach((m) => {
-      const key = format(new Date(m.kickoff_at), "yyyy-MM-dd");
+      const key = localDateKey(m.kickoff_at, m.venue_tz);
       const arr = byDate.get(key) ?? [];
       arr.push(m);
       byDate.set(key, arr);
