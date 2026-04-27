@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Save, Lock, X } from "lucide-react";
 import { toast } from "sonner";
-import { format, isAfter, subMinutes } from "date-fns";
+import { format, isAfter, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
 
