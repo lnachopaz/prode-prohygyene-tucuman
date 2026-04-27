@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Save, Lock } from "lucide-react";
 import { toast } from "sonner";
-import { format, isAfter, subMinutes } from "date-fns";
-import { es } from "date-fns/locale";
+import { isAfter, subMinutes } from "date-fns";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
+import { formatLocalTime, localDateKey, formatLocalDateHeading } from "@/lib/matchTime";
 
 type Match = {
   id: string;
@@ -21,6 +21,8 @@ type Match = {
   team_a_flag: string | null;
   team_b_flag: string | null;
   kickoff_at: string;
+  venue: string | null;
+  venue_tz: string | null;
   status: "scheduled" | "live" | "finished";
   score_a: number | null;
   score_b: number | null;
@@ -72,7 +74,7 @@ export default function Predictions() {
     if (!matches) return [];
     const byDate = new Map<string, Match[]>();
     matches.forEach((m) => {
-      const key = format(new Date(m.kickoff_at), "yyyy-MM-dd");
+      const key = localDateKey(m.kickoff_at, m.venue_tz);
       const arr = byDate.get(key) ?? [];
       arr.push(m);
       byDate.set(key, arr);
@@ -107,7 +109,7 @@ export default function Predictions() {
       {grouped.map(([date, dayMatches]) => (
         <section key={date} className="space-y-3">
           <h2 className="text-lg font-semibold capitalize text-muted-foreground">
-            {format(new Date(date), "EEEE d 'de' MMMM yyyy", { locale: es })}
+            {formatLocalDateHeading(dayMatches[0].kickoff_at, dayMatches[0].venue_tz)}
           </h2>
           <div className="grid gap-3 md:grid-cols-2">
             {dayMatches.map((m) => {
@@ -185,17 +187,22 @@ function MatchCard({
     if (match.status === "live") return <Badge className="bg-destructive text-destructive-foreground">EN VIVO</Badge>;
     if (match.status === "finished") return <Badge variant="secondary">Finalizado</Badge>;
     if (locked) return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Cerrado</Badge>;
-    return <Badge variant="outline">{format(new Date(match.kickoff_at), "HH:mm")}</Badge>;
+    return <Badge variant="outline">{formatLocalTime(match.kickoff_at, match.venue_tz)}</Badge>;
   };
 
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-4 space-y-3">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className="font-medium">
-            {match.stage}
-            {match.group_name ? ` · ${match.group_name}` : ""}
-          </span>
+        <div className="flex items-start justify-between gap-2 text-xs text-muted-foreground">
+          <div className="min-w-0">
+            <div className="font-medium">
+              {match.stage}
+              {match.group_name ? ` · ${match.group_name}` : ""}
+            </div>
+            {match.venue && (
+              <div className="truncate text-[11px] opacity-80">{match.venue}</div>
+            )}
+          </div>
           {statusBadge()}
         </div>
 

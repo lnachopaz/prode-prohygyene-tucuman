@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Save, Plus, Trash2 } from "lucide-react";
+import { Loader2, Save, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 export default function Admin() {
@@ -36,7 +36,7 @@ export default function Admin() {
 
 function MatchesAdmin() {
   const qc = useQueryClient();
-  const [syncing, setSyncing] = useState(false);
+  
   const { data: matches, isLoading } = useQuery({
     queryKey: ["admin-matches"],
     queryFn: async () => {
@@ -46,23 +46,9 @@ function MatchesAdmin() {
     },
   });
 
-  async function syncFromApi() {
-    setSyncing(true);
-    const { data, error } = await supabase.functions.invoke("sync-matches");
-    setSyncing(false);
-    if (error) return toast.error(error.message);
-    toast.success((data as any)?.message ?? "Sincronizado");
-    qc.invalidateQueries({ queryKey: ["admin-matches"] });
-    qc.invalidateQueries({ queryKey: ["matches"] });
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <Button onClick={syncFromApi} disabled={syncing}>
-          {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-          Sincronizar desde TheSportsDB
-        </Button>
         <NewMatchDialog onCreated={() => qc.invalidateQueries({ queryKey: ["admin-matches"] })} />
       </div>
 

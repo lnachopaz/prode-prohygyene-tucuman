@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Radio, Clock, Trophy } from "lucide-react";
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { es } from "date-fns/locale";
 import { Countdown } from "@/components/Countdown";
 
@@ -120,7 +120,8 @@ export default function Live() {
                 <div className="text-2xl font-bold text-muted-foreground">vs</div>
               )}
               <div className="text-xs text-muted-foreground mt-1">
-                {format(new Date(m.kickoff_at), "dd MMM · HH:mm", { locale: es })}
+                {formatInTimeZone(m.kickoff_at, m.venue_tz || "America/Mexico_City", "dd MMM · HH:mm", { locale: es })}
+                {m.venue ? ` · ${m.venue}` : ""}
               </div>
             </div>
             <div className="text-center">
@@ -181,7 +182,7 @@ export default function Live() {
               <div key={u.id} className="flex items-center justify-between py-2 border-b last:border-0">
                 <div className="min-w-0">
                   <div className="text-xs text-muted-foreground">
-                    {format(new Date(u.kickoff_at), "EEE dd MMM · HH:mm", { locale: es })}
+                    {formatInTimeZone(u.kickoff_at, u.venue_tz || "America/Mexico_City", "EEE dd MMM · HH:mm", { locale: es })}
                   </div>
                   <div className="text-sm font-medium truncate">{u.team_a} vs {u.team_b}</div>
                 </div>
