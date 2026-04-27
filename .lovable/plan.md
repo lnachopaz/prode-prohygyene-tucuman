@@ -1,61 +1,41 @@
+# Aprobación de registro por admin
 
-# Prode Mundial 2026 — ProHygiene
+Los nuevos usuarios podrán registrarse pero quedarán **pendientes** hasta que un admin los apruebe. Mientras estén pendientes, no podrán entrar a la app (verán una pantalla de "Esperando aprobación").
 
-App web para que un grupo de amigos pronostique los partidos del Mundial 2026, con ranking, panel admin y partidos sincronizados desde TheSportsDB.
+## Flujo del usuario
 
-## Branding y diseño
+1. Usuario completa el formulario de registro (igual que ahora).
+2. Se crea su cuenta pero con estado `pending`.
+3. Al iniciar sesión, en lugar de la app, ve un mensaje: **"Tu cuenta está pendiente de aprobación por un administrador"** con un botón para cerrar sesión.
+4. Cuando el admin lo aprueba, en su próximo login (o refresh) ya entra normalmente.
+5. Si el admin lo rechaza, ve mensaje de cuenta rechazada.
 
-- Logo ProHygiene en header y pantalla de login (lo guardo en `src/assets/`).
-- Paleta minimalista: azul marino ProHygiene como primario, blanco y grises neutros, acentos sutiles para estados (verde acierto, ámbar pendiente, rojo error).
-- Tipografía sans moderna (Inter) para look deportivo limpio.
-- Toggle de modo oscuro opcional (persistido en localStorage), oscuro con fondo profundo y mismo azul de marca.
-- Componentes Shadcn UI + Tailwind, diseño responsive mobile-first.
+**Excepción**: si el usuario se registra con un código de admin válido, queda **aprobado automáticamente** (los admins no requieren aprobación).
 
-## Pantallas
+## Flujo del admin
 
-1. **Login / Registro** — email + password (Supabase Auth), con logo PH centrado.
-2. **Partidos / Pronósticos** — lista agrupada por fecha y fase (grupos, octavos, etc.). Cada card muestra banderas/nombres de selecciones, hora local, estado (programado / en vivo / finalizado) y dos inputs numéricos (Equipo A / Equipo B) + botón Guardar. Bloqueo automático **5 minutos antes del kickoff**: inputs deshabilitados y badge "Cerrado". Para partidos finalizados se muestra el resultado real, el pronóstico del usuario y los puntos obtenidos.
-3. **Ranking** — tabla de todos los usuarios ordenada por puntos totales, con columnas: posición, nombre, aciertos exactos, aciertos de resultado, total. Resalta al usuario logueado.
-4. **Mi perfil** — nombre visible, avatar opcional, mis pronósticos y puntos.
-5. **Admin** (solo rol admin) — tabs:
-   - Partidos: editar resultado real manualmente, forzar recálculo de puntos, sincronizar desde TheSportsDB.
-   - Usuarios: ver lista, cambiar nombre visible, otorgar/revocar admin, eliminar.
-   - Ajustes: regenerar código de invitación admin.
-6. **Registro con código admin** — durante el registro hay un campo opcional "código de invitación"; si coincide con el código admin vigente, al usuario se le asigna rol `admin`.
+En **Panel admin → Usuarios** se agrega:
+- Nueva sección **"Pendientes de aprobación"** arriba, con cada usuario mostrando nombre, email, fecha de registro, y botones **Aprobar** / **Rechazar**.
+- La lista existente de usuarios sigue mostrando los aprobados.
+- Badge con número de pendientes en el tab "Usuarios" para que el admin lo vea.
 
-## Lógica de puntos
+## Cambios técnicos
 
-Función SQL/edge que para cada pronóstico de partido finalizado compara contra el resultado real:
-- 3 pts si goles exactos coinciden.
-- 1 pt si acierta el signo (gana A, gana B, o empate) pero no los goles.
-- 0 pts en otro caso.
+### Base de datos (migración)
+- Agregar columna `status` a `profiles` con enum `user_status` (`pending`, `approved`, `rejected`), default `pending`.
+- Actualizar `handle_new_user()` para que asigne `approved` si el código admin es válido, sino `pending`.
+- Marcar como `approved` a todos los usuarios existentes (para no romper cuentas actuales).
+- Nueva función security-definer `is_approved(_user_id uuid)` para chequear estado.
+- Política RLS en `profiles`: admins pueden actualizar `status` (ya existe `profiles_admin_update_any`, sirve).
+- Política nueva en `predictions`: solo usuarios aprobados pueden insertar/actualizar (refuerzo server-side).
 
-Se ejecuta automáticamente cuando un partido se marca como finalizado (trigger) y también de forma manual desde admin.
+### Frontend
+- **`src/lib/auth.ts`**: agregar `status` al hook `useAuth` (consulta `profiles.status` tras login).
+- **`src/components/ProtectedRoute.tsx`**: si `status !== 'approved'` y no es admin, redirigir a nueva pantalla `/pending`.
+- **Nueva página `src/pages/Pending.tsx`**: muestra mensaje según estado (pending / rejected) + botón cerrar sesión.
+- **`src/App.tsx`**: agregar ruta `/pending`.
+- **`src/pages/Admin.tsx` → `UsersAdmin`**: agregar sección de pendientes con botones Aprobar/Rechazar (update a `profiles.status`), y badge con conteo en el TabsTrigger.
 
-## Integración TheSportsDB
+## Sobre "no puedo entrar como admin"
 
-- Edge function `sync-matches` que llama a TheSportsDB para traer fixtures y resultados del Mundial 2026 (ID de liga FIFA World Cup) y hace upsert en la tabla `matches`.
-- Se invoca: (a) manualmente desde panel admin, (b) en un cron cada ~10 minutos para mantener resultados en vivo.
-- Si TheSportsDB todavía no publicó el fixture del Mundial 2026 al momento de implementar, el admin puede cargar partidos manualmente y la sincronización completará campos cuando estén disponibles.
-
-## Modelo de datos (Lovable Cloud / Supabase)
-
-- `profiles` (id ↔ auth.users, display_name, avatar_url, created_at).
-- `user_roles` (user_id, role enum `admin`|`user`) + función `has_role()` security definer.
-- `matches` (id, external_id TheSportsDB, stage, group, team_a, team_b, team_a_flag, team_b_flag, kickoff_at, status, score_a, score_b, updated_at).
-- `predictions` (id, user_id, match_id, pred_a, pred_b, points, locked, created_at, updated_at) — único por (user_id, match_id).
-- `admin_invite_codes` (code, active, created_at) — un código vigente a la vez.
-- Vista `leaderboard` que suma puntos por usuario.
-- RLS: cada usuario lee/escribe solo sus pronósticos (y solo si el partido aún no está bloqueado), todos pueden leer matches y leaderboard, solo admins editan matches/usuarios.
-
-## Detalles técnicos
-
-- React + Vite + Tailwind + Shadcn UI, React Router, TanStack Query.
-- Lovable Cloud para auth, base de datos y edge functions.
-- Edge functions: `sync-matches`, `recalculate-points`, `validate-admin-code`.
-- Cron de Supabase para `sync-matches` cada 10 minutos.
-- Bloqueo de pronósticos validado tanto en UI como en RLS (chequeo de `kickoff_at - now() > 5 min`).
-
-## Fuera de alcance (por ahora)
-
-- Login social, notificaciones push, chat grupal, apuestas con dinero, multi-torneo. Se pueden agregar después.
+Mencionaste antes que no podías entrar como admin. Si seguís con ese problema después de este cambio, avisame con el email de la cuenta admin para revisarlo aparte (probablemente el usuario admin no tiene rol `admin` en `user_roles`, lo puedo verificar con una consulta).

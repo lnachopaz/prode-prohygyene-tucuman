@@ -12,6 +12,7 @@ import Live from "./pages/Live";
 import Ranking from "./pages/Ranking";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
+import Pending from "./pages/Pending";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/pending" element={<Pending />} />
           <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/predictions" element={<Predictions />} />
