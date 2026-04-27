@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, ListChecks, Calendar, Target, TrendingUp, Loader2, Radio } from "lucide-react";
 import { Countdown } from "@/components/Countdown";
-import { Flag } from "@/components/Flag";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -85,11 +84,7 @@ export default function Dashboard() {
               <div className="text-xs uppercase tracking-wider text-primary font-semibold mb-1 flex items-center gap-1">
                 <Radio className="h-3 w-3" /> Próximo partido
               </div>
-              <div className="text-lg font-bold truncate flex items-center gap-2">
-                <Flag name={nextMatches[0].team_a} size="md" />
-                {nextMatches[0].team_a} vs {nextMatches[0].team_b}
-                <Flag name={nextMatches[0].team_b} size="md" />
-              </div>
+              <div className="text-lg font-bold truncate">{nextMatches[0].team_a} vs {nextMatches[0].team_b}</div>
               <div className="text-xs text-muted-foreground">
                 {format(new Date(nextMatches[0].kickoff_at), "EEEE dd MMM · HH:mm 'hs'", { locale: es })}
               </div>
@@ -134,11 +129,7 @@ export default function Dashboard() {
                     {format(new Date(m.kickoff_at), "EEE dd MMM · HH:mm", { locale: es })}
                     {m.group_name ? ` · Grupo ${m.group_name}` : ""}
                   </div>
-                  <div className="font-medium text-sm truncate flex items-center gap-2">
-                    <Flag name={m.team_a} size="sm" />
-                    {m.team_a} vs {m.team_b}
-                    <Flag name={m.team_b} size="sm" />
-                  </div>
+                  <div className="font-medium text-sm truncate">{m.team_a} vs {m.team_b}</div>
                 </div>
                 <Badge variant="outline" className="shrink-0 text-[10px]">{m.stage.split(" · ")[0]}</Badge>
               </div>

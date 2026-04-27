@@ -6,7 +6,6 @@ import { Loader2, Radio, Clock, Trophy } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Countdown } from "@/components/Countdown";
-import { Flag } from "@/components/Flag";
 
 export default function Live() {
   // Match en vivo: status=live, o si no hay, el próximo
@@ -109,8 +108,7 @@ export default function Live() {
         </div>
         <CardContent className="p-6">
           <div className="grid grid-cols-3 items-center gap-4">
-            <div className="flex flex-col items-center text-center gap-2">
-              <Flag name={m.team_a} size="lg" />
+            <div className="text-center">
               <div className="text-lg md:text-xl font-bold">{m.team_a}</div>
             </div>
             <div className="text-center">
@@ -125,8 +123,7 @@ export default function Live() {
                 {format(new Date(m.kickoff_at), "dd MMM · HH:mm", { locale: es })}
               </div>
             </div>
-            <div className="flex flex-col items-center text-center gap-2">
-              <Flag name={m.team_b} size="lg" />
+            <div className="text-center">
               <div className="text-lg md:text-xl font-bold">{m.team_b}</div>
             </div>
           </div>
@@ -186,11 +183,7 @@ export default function Live() {
                   <div className="text-xs text-muted-foreground">
                     {format(new Date(u.kickoff_at), "EEE dd MMM · HH:mm", { locale: es })}
                   </div>
-                  <div className="text-sm font-medium truncate flex items-center gap-2">
-                    <Flag name={u.team_a} size="sm" />
-                    {u.team_a} vs {u.team_b}
-                    <Flag name={u.team_b} size="sm" />
-                  </div>
+                  <div className="text-sm font-medium truncate">{u.team_a} vs {u.team_b}</div>
                 </div>
               </div>
             ))}
