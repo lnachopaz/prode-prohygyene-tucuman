@@ -120,7 +120,8 @@ export default function Live() {
                 <div className="text-2xl font-bold text-muted-foreground">vs</div>
               )}
               <div className="text-xs text-muted-foreground mt-1">
-                {format(new Date(m.kickoff_at), "dd MMM · HH:mm", { locale: es })}
+                {formatInTimeZone(m.kickoff_at, m.venue_tz || "America/Mexico_City", "dd MMM · HH:mm", { locale: es })}
+                {m.venue ? ` · ${m.venue}` : ""}
               </div>
             </div>
             <div className="text-center">
