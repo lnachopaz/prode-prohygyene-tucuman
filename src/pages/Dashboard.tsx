@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, ListChecks, Calendar, Target, TrendingUp, Loader2, Radio } from "lucide-react";
 import { Countdown } from "@/components/Countdown";
-import { format } from "date-fns";
+import { formatLocalTime, formatLocalDateHeading } from "@/lib/matchTime";
+import { formatInTimeZone } from "date-fns-tz";
+import { es } from "date-fns/locale";
 import { es } from "date-fns/locale";
 
 export default function Dashboard() {
