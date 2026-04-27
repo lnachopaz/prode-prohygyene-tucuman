@@ -143,8 +143,11 @@ export default function Live() {
         </div>
         <CardContent className="p-6">
           <div className="grid grid-cols-3 items-center gap-4">
-            <div className="text-center">
-              <div className="text-lg md:text-xl font-bold">{m.team_a}</div>
+            <div className="text-center flex flex-col items-center gap-2">
+              {m.team_a_flag && (
+                <img src={m.team_a_flag} alt={m.team_a} className="h-12 w-12 md:h-16 md:w-16 object-contain" />
+              )}
+              <div className="text-sm md:text-xl font-bold">{m.team_a}</div>
             </div>
             <div className="text-center">
               {liveMatch.isLive || m.score_a !== null ? (
@@ -158,8 +161,11 @@ export default function Live() {
                 {format(new Date(m.kickoff_at), "dd MMM · HH:mm", { locale: es })}
               </div>
             </div>
-            <div className="text-center">
-              <div className="text-lg md:text-xl font-bold">{m.team_b}</div>
+            <div className="text-center flex flex-col items-center gap-2">
+              {m.team_b_flag && (
+                <img src={m.team_b_flag} alt={m.team_b} className="h-12 w-12 md:h-16 md:w-16 object-contain" />
+              )}
+              <div className="text-sm md:text-xl font-bold">{m.team_b}</div>
             </div>
           </div>
 
