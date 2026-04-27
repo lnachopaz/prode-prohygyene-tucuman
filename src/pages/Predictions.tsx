@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Save, Lock, X } from "lucide-react";
 import { toast } from "sonner";
-import { format, isAfter, subMinutes } from "date-fns";
+import { format, isAfter, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
 
@@ -102,7 +102,7 @@ export default function Predictions() {
       if (term && !m.team_a.toLowerCase().includes(term) && !m.team_b.toLowerCase().includes(term)) return false;
       if (predStatusFilter !== "all") {
         const p = predMap.get(m.id);
-        const lockAt = subMinutes(new Date(m.kickoff_at), 5);
+        const lockAt = subHours(new Date(m.kickoff_at), 1);
         const locked = !isAfter(lockAt, now) || m.status !== "scheduled";
         if (predStatusFilter === "loaded" && !p) return false;
         if (predStatusFilter === "missing" && p) return false;
@@ -156,7 +156,7 @@ export default function Predictions() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold">Pronósticos</h1>
-        <p className="text-muted-foreground">Cargá tus marcadores antes del cierre (5 min antes del partido).</p>
+        <p className="text-muted-foreground">Cargá tus marcadores antes del cierre (1 hora antes del partido).</p>
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
@@ -250,7 +250,7 @@ function MatchCard({
   onSaved: () => void;
 }) {
   const { user } = useAuth();
-  const lockAt = subMinutes(new Date(match.kickoff_at), 5);
+  const lockAt = subHours(new Date(match.kickoff_at), 1);
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000);

@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Radio, Clock, Trophy } from "lucide-react";
-import { format } from "date-fns";
+import { format, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { Countdown } from "@/components/Countdown";
 
@@ -35,10 +35,11 @@ export default function Live() {
 
   const matchId = liveMatch?.match?.id;
   const started = liveMatch ? (liveMatch.isLive || new Date(liveMatch.match.kickoff_at) <= new Date()) : false;
+  const predsLocked = liveMatch ? subHours(new Date(liveMatch.match.kickoff_at), 1) <= new Date() : false;
 
   const { data: predictions } = useQuery({
-    queryKey: ["live-predictions", matchId, started],
-    enabled: !!matchId && started,
+    queryKey: ["live-predictions", matchId, predsLocked],
+    enabled: !!matchId && predsLocked,
     refetchInterval: 30_000,
     queryFn: async () => {
       const { data: preds } = await supabase
@@ -144,8 +145,8 @@ export default function Live() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {!started ? (
-            <p className="text-sm text-muted-foreground">Los pronósticos se mostrarán cuando arranque el partido.</p>
+          {!predsLocked ? (
+            <p className="text-sm text-muted-foreground">Los pronósticos se mostrarán cuando cierren (1 hora antes del partido).</p>
           ) : !predictions || predictions.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nadie pronosticó este partido.</p>
           ) : (
