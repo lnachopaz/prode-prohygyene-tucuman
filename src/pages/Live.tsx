@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Radio, Clock, Trophy } from "lucide-react";
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+import { es } from "date-fns/locale";
 import { es } from "date-fns/locale";
 import { Countdown } from "@/components/Countdown";
 
