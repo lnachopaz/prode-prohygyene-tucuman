@@ -39,7 +39,7 @@ export default function Ranking() {
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <Trophy className="h-7 w-7 text-primary" /> Ranking
         </h1>
-        <p className="text-muted-foreground">3 pts por marcador exacto · 1 pt por acertar el resultado</p>
+        <p className="text-muted-foreground">3 pts por pleno (marcador exacto) · 1 pt por acertar el resultado</p>
       </div>
 
       <Card>
@@ -48,7 +48,7 @@ export default function Ranking() {
             <div className="grid grid-cols-[40px_1fr_60px_60px_70px] gap-3 px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">
               <span>#</span>
               <span>Jugador</span>
-              <span className="text-center">Exact.</span>
+              <span className="text-center">Plenos</span>
               <span className="text-center">Result.</span>
               <span className="text-right">Total</span>
             </div>

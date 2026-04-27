@@ -65,7 +65,7 @@ export default function Profile() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Puntos totales" value={stats?.total_points ?? 0} />
-        <StatCard label="Exactos" value={stats?.exact_hits ?? 0} />
+        <StatCard label="Plenos" value={stats?.exact_hits ?? 0} />
         <StatCard label="Resultado" value={stats?.result_hits ?? 0} />
       </div>
 
