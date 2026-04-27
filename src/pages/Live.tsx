@@ -118,11 +118,17 @@ export default function Live() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Radio className="h-7 w-7 text-primary" /> Live
-        </h1>
-        <p className="text-muted-foreground">Seguí el partido en vivo y los pronósticos del grupo.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Radio className="h-7 w-7 text-primary" /> Live
+          </h1>
+          <p className="text-muted-foreground">Seguí el partido en vivo y los pronósticos del grupo.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => syncLive(false)} disabled={syncing}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+          Actualizar
+        </Button>
       </div>
 
       {/* Match card */}
