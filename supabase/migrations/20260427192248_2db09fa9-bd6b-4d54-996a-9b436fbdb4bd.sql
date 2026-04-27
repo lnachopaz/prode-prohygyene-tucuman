@@ -1,0 +1,1 @@
+UPDATE public.matches SET kickoff_at = kickoff_at - INTERVAL '3 hours' WHERE status = 'scheduled';
