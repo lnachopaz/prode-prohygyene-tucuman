@@ -10,6 +10,7 @@ import { Loader2, Save, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { format, isAfter, subMinutes } from "date-fns";
 import { es } from "date-fns/locale";
+import { getCountryFlagUrl } from "@/lib/countryFlags";
 
 type Match = {
   id: string;
@@ -109,14 +110,21 @@ export default function Predictions() {
             {format(new Date(date), "EEEE d 'de' MMMM yyyy", { locale: es })}
           </h2>
           <div className="grid gap-3 md:grid-cols-2">
-            {dayMatches.map((m) => (
-              <MatchCard
-                key={m.id}
-                match={m}
-                prediction={predMap.get(m.id)}
-                onSaved={() => qc.invalidateQueries({ queryKey: ["my-preds"] })}
-              />
-            ))}
+            {dayMatches.map((m) => {
+              const matchWithFlags = {
+                ...m,
+                team_a_flag: getCountryFlagUrl(m.team_a) ?? m.team_a_flag,
+                team_b_flag: getCountryFlagUrl(m.team_b) ?? m.team_b_flag,
+              };
+              return (
+                <MatchCard
+                  key={m.id}
+                  match={matchWithFlags}
+                  prediction={predMap.get(m.id)}
+                  onSaved={() => qc.invalidateQueries({ queryKey: ["my-preds"] })}
+                />
+              );
+            })}
           </div>
         </section>
       ))}
