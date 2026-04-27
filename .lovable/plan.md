@@ -1,41 +1,37 @@
-# Aprobación de registro por admin
+# Arreglar partidos duplicados en la tabla
 
-Los nuevos usuarios podrán registrarse pero quedarán **pendientes** hasta que un admin los apruebe. Mientras estén pendientes, no podrán entrar a la app (verán una pantalla de "Esperando aprobación").
+## Diagnóstico
 
-## Flujo del usuario
+Revisé la base de datos y encontré el problema real:
 
-1. Usuario completa el formulario de registro (igual que ahora).
-2. Se crea su cuenta pero con estado `pending`.
-3. Al iniciar sesión, en lugar de la app, ve un mensaje: **"Tu cuenta está pendiente de aprobación por un administrador"** con un botón para cerrar sesión.
-4. Cuando el admin lo aprueba, en su próximo login (o refresh) ya entra normalmente.
-5. Si el admin lo rechaza, ve mensaje de cuenta rechazada.
+- Hay **104 partidos correctos** del Mundial 2026 cargados en español (con nombres como "México", "Sudáfrica", "Estadio Ciudad de México") — este es el fixture oficial completo (48 equipos, 104 partidos).
+- Hay **15 partidos duplicados en inglés** (con nombres como "Mexico", "South Africa", stage = "Group Stage") que entraron desde **TheSportsDB** vía la edge function `sync-matches`.
 
-**Excepción**: si el usuario se registra con un código de admin válido, queda **aprobado automáticamente** (los admins no requieren aprobación).
+Por ejemplo, México vs Sudáfrica aparece dos veces:
+- "México vs Sudáfrica" — 11 jun 15:00 UTC — Estadio Ciudad de México (correcto)
+- "Mexico vs South Africa" — 11 jun 19:00 UTC — Group Stage (duplicado de TheSportsDB con horario incorrecto)
 
-## Flujo del admin
+Como tienen `external_id` distintos y nombres traducidos, el `upsert` no los detectó como iguales.
 
-En **Panel admin → Usuarios** se agrega:
-- Nueva sección **"Pendientes de aprobación"** arriba, con cada usuario mostrando nombre, email, fecha de registro, y botones **Aprobar** / **Rechazar**.
-- La lista existente de usuarios sigue mostrando los aprobados.
-- Badge con número de pendientes en el tab "Usuarios" para que el admin lo vea.
+**Buena noticia:** los 15 duplicados NO tienen pronósticos asociados (verificado), así que se pueden borrar sin perder datos de usuarios.
 
-## Cambios técnicos
+## Plan de acción
 
-### Base de datos (migración)
-- Agregar columna `status` a `profiles` con enum `user_status` (`pending`, `approved`, `rejected`), default `pending`.
-- Actualizar `handle_new_user()` para que asigne `approved` si el código admin es válido, sino `pending`.
-- Marcar como `approved` a todos los usuarios existentes (para no romper cuentas actuales).
-- Nueva función security-definer `is_approved(_user_id uuid)` para chequear estado.
-- Política RLS en `profiles`: admins pueden actualizar `status` (ya existe `profiles_admin_update_any`, sirve).
-- Política nueva en `predictions`: solo usuarios aprobados pueden insertar/actualizar (refuerzo server-side).
+### 1. Borrar los 15 partidos duplicados
+Eliminar todos los partidos donde `stage = 'Group Stage'` (los 15 que vinieron de TheSportsDB; el fixture en español usa stages como "Fase de grupos · Estadio X").
 
-### Frontend
-- **`src/lib/auth.ts`**: agregar `status` al hook `useAuth` (consulta `profiles.status` tras login).
-- **`src/components/ProtectedRoute.tsx`**: si `status !== 'approved'` y no es admin, redirigir a nueva pantalla `/pending`.
-- **Nueva página `src/pages/Pending.tsx`**: muestra mensaje según estado (pending / rejected) + botón cerrar sesión.
-- **`src/App.tsx`**: agregar ruta `/pending`.
-- **`src/pages/Admin.tsx` → `UsersAdmin`**: agregar sección de pendientes con botones Aprobar/Rechazar (update a `profiles.status`), y badge con conteo en el TabsTrigger.
+### 2. Desactivar la edge function de sincronización
+Para que los duplicados no vuelvan a entrar la próxima vez que alguien presione "Sincronizar" desde el Admin:
+- Modificar `supabase/functions/sync-matches/index.ts` para que devuelva un mensaje indicando que el fixture ya está cargado manualmente y no haga el upsert.
+- Alternativa: ocultar/quitar el botón "Sincronizar fixture" del panel de Admin (`src/pages/Admin.tsx`).
 
-## Sobre "no puedo entrar como admin"
+### 3. NO recargar partidos desde internet
+El fixture completo y correcto del Mundial 2026 (las 104 fechas oficiales en español, con sedes correctas) **ya está cargado**. No es necesario buscar partidos en internet — solo hay que limpiar los duplicados que metió la sincronización vieja.
 
-Mencionaste antes que no podías entrar como admin. Si seguís con ese problema después de este cambio, avisame con el email de la cuenta admin para revisarlo aparte (probablemente el usuario admin no tiene rol `admin` en `user_roles`, lo puedo verificar con una consulta).
+## Detalles técnicos
+
+- **Migración SQL:** `DELETE FROM matches WHERE stage = 'Group Stage';` (borra exactamente 15 filas, ninguna con predictions).
+- **Edge function:** dejar `sync-matches/index.ts` como no-op que retorna `{ disabled: true, message: "Fixture cargado manualmente" }` para no romper el botón existente del admin.
+- **Admin UI:** opcionalmente reemplazar el botón "Sincronizar" por un texto informativo.
+
+¿Procedo con esto?
