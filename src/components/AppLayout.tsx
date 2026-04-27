@@ -19,9 +19,7 @@ export default function AppLayout() {
   const navItem = (active: boolean) =>
     cn(
       "inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-      active
-        ? "bg-primary text-primary-foreground"
-        : "text-muted-foreground hover:text-foreground hover:bg-muted",
+      active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted",
     );
 
   return (
@@ -29,7 +27,7 @@ export default function AppLayout() {
       <header className="border-b bg-card sticky top-0 z-40">
         <div className="container flex h-20 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <img src={logo} alt="ProHygiene" className="h-14 md:h-16 w-auto" />
+            <img src={logo} alt="ProHygiene" className="h-14 md:h-30 w-auto" />
             <div className="hidden sm:block">
               <p className="text-xs text-muted-foreground leading-none">PH Prode</p>
               <p className="text-sm font-bold leading-tight">Mundial 2026</p>
