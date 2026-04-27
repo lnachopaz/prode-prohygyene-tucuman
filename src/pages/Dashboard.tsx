@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, ListChecks, Calendar, Target, TrendingUp, Loader2, Radio } from "lucide-react";
 import { Countdown } from "@/components/Countdown";
-import { formatInTimeZone } from "date-fns-tz";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 export default function Dashboard() {
@@ -86,8 +86,7 @@ export default function Dashboard() {
               </div>
               <div className="text-lg font-bold truncate">{nextMatches[0].team_a} vs {nextMatches[0].team_b}</div>
               <div className="text-xs text-muted-foreground">
-                {formatInTimeZone(nextMatches[0].kickoff_at, nextMatches[0].venue_tz || "America/Mexico_City", "EEEE dd MMM · HH:mm 'hs'", { locale: es })}
-                {nextMatches[0].venue ? ` · ${nextMatches[0].venue}` : ""}
+                {format(new Date(nextMatches[0].kickoff_at), "EEEE dd MMM · HH:mm 'hs'", { locale: es })}
               </div>
             </div>
             <Countdown to={nextMatches[0].kickoff_at} />
@@ -127,8 +126,8 @@ export default function Dashboard() {
               <div key={m.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-0">
                 <div className="min-w-0">
                   <div className="text-xs text-muted-foreground truncate">
-                    {formatInTimeZone(m.kickoff_at, m.venue_tz || "America/Mexico_City", "EEE dd MMM · HH:mm", { locale: es })}
-                    {m.group_name ? ` · ${m.group_name}` : ""}
+                    {format(new Date(m.kickoff_at), "EEE dd MMM · HH:mm", { locale: es })}
+                    {m.group_name ? ` · Grupo ${m.group_name}` : ""}
                   </div>
                   <div className="font-medium text-sm truncate">{m.team_a} vs {m.team_b}</div>
                 </div>
