@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
 
 export function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode; requireAdmin?: boolean }) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, status, loading } = useAuth();
 
   if (loading) {
     return (
@@ -14,6 +14,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: { children: R
   }
 
   if (!user) return <Navigate to="/auth" replace />;
+  if (!isAdmin && status && status !== "approved") return <Navigate to="/pending" replace />;
   if (requireAdmin && !isAdmin) return <Navigate to="/" replace />;
   return <>{children}</>;
 }

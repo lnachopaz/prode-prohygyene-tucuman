@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
+export type UserStatus = "pending" | "approved" | "rejected";
+
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [status, setStatus] = useState<UserStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -13,9 +16,13 @@ export function useAuth() {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        setTimeout(() => checkAdmin(s.user.id), 0);
+        setTimeout(() => {
+          checkAdmin(s.user.id);
+          checkStatus(s.user.id);
+        }, 0);
       } else {
         setIsAdmin(false);
+        setStatus(null);
       }
     });
 
@@ -23,7 +30,7 @@ export function useAuth() {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        await checkAdmin(s.user.id);
+        await Promise.all([checkAdmin(s.user.id), checkStatus(s.user.id)]);
       }
       setLoading(false);
     });
@@ -36,7 +43,12 @@ export function useAuth() {
     setIsAdmin(!!data);
   }
 
-  return { session, user, isAdmin, loading };
+  async function checkStatus(userId: string) {
+    const { data } = await supabase.from("profiles").select("status").eq("id", userId).maybeSingle();
+    setStatus(((data as any)?.status ?? null) as UserStatus | null);
+  }
+
+  return { session, user, isAdmin, status, loading };
 }
 
 export async function signOut() {
