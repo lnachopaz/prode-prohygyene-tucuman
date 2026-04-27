@@ -97,7 +97,7 @@ export default function Dashboard() {
       {/* Stats grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard icon={<Trophy className="h-4 w-4" />} label="Mis puntos" value={stats?.points ?? 0} />
-        <StatCard icon={<Target className="h-4 w-4" />} label="Aciertos exactos" value={stats?.exact ?? 0} />
+        <StatCard icon={<Target className="h-4 w-4" />} label="Plenos" value={stats?.exact ?? 0} />
         <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Aciertos resultado" value={stats?.results ?? 0} />
         <StatCard icon={<ListChecks className="h-4 w-4" />} label="Pronósticos" value={`${stats?.predictionsCount ?? 0}/${stats?.totalMatches ?? 0}`} />
       </div>
@@ -153,7 +153,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right shrink-0">
                   <div className="font-bold">{u.total_points} pts</div>
-                  <div className="text-xs text-muted-foreground">{u.exact_hits} exactos</div>
+                  <div className="text-xs text-muted-foreground">{u.exact_hits} plenos</div>
                 </div>
               </div>
             ))}
