@@ -87,7 +87,8 @@ export default function Dashboard() {
               </div>
               <div className="text-lg font-bold truncate">{nextMatches[0].team_a} vs {nextMatches[0].team_b}</div>
               <div className="text-xs text-muted-foreground">
-                {format(new Date(nextMatches[0].kickoff_at), "EEEE dd MMM · HH:mm 'hs'", { locale: es })}
+                {formatInTimeZone(nextMatches[0].kickoff_at, nextMatches[0].venue_tz || "America/Mexico_City", "EEEE dd MMM · HH:mm 'hs'", { locale: es })}
+                {nextMatches[0].venue ? ` · ${nextMatches[0].venue}` : ""}
               </div>
             </div>
             <Countdown to={nextMatches[0].kickoff_at} />
