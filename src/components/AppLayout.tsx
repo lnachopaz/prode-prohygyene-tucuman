@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Trophy, ListChecks, Shield, LogOut, Moon, Sun, User as UserIcon, LayoutDashboard } from "lucide-react";
+import { Trophy, ListChecks, Shield, LogOut, Moon, Sun, User as UserIcon, LayoutDashboard, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/prohygiene-logo.png";
 import { useAuth, signOut } from "@/lib/auth";
@@ -43,6 +43,9 @@ export default function AppLayout() {
             <NavLink to="/predictions" className={({ isActive }) => navItem(isActive)}>
               <ListChecks className="h-4 w-4" /> Pronósticos
             </NavLink>
+            <NavLink to="/live" className={({ isActive }) => navItem(isActive)}>
+              <Radio className="h-4 w-4" /> Live
+            </NavLink>
             <NavLink to="/ranking" className={({ isActive }) => navItem(isActive)}>
               <Trophy className="h-4 w-4" /> Ranking
             </NavLink>
@@ -75,6 +78,9 @@ export default function AppLayout() {
           </NavLink>
           <NavLink to="/predictions" className={({ isActive }) => navItem(isActive)}>
             <ListChecks className="h-4 w-4" />
+          </NavLink>
+          <NavLink to="/live" className={({ isActive }) => navItem(isActive)}>
+            <Radio className="h-4 w-4" />
           </NavLink>
           <NavLink to="/ranking" className={({ isActive }) => navItem(isActive)}>
             <Trophy className="h-4 w-4" />

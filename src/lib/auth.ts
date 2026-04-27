@@ -13,17 +13,18 @@ export function useAuth() {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        // Defer to avoid deadlock
         setTimeout(() => checkAdmin(s.user.id), 0);
       } else {
         setIsAdmin(false);
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) checkAdmin(s.user.id);
+      if (s?.user) {
+        await checkAdmin(s.user.id);
+      }
       setLoading(false);
     });
 
