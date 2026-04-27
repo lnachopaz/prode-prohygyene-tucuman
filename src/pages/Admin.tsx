@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Save, Plus, Trash2 } from "lucide-react";
+import { Loader2, Save, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 export default function Admin() {
