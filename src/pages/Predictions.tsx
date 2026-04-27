@@ -109,7 +109,7 @@ export default function Predictions() {
       {grouped.map(([date, dayMatches]) => (
         <section key={date} className="space-y-3">
           <h2 className="text-lg font-semibold capitalize text-muted-foreground">
-            {format(new Date(date), "EEEE d 'de' MMMM yyyy", { locale: es })}
+            {formatLocalDateHeading(dayMatches[0].kickoff_at, dayMatches[0].venue_tz)}
           </h2>
           <div className="grid gap-3 md:grid-cols-2">
             {dayMatches.map((m) => {
