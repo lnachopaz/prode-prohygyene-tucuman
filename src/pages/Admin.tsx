@@ -370,9 +370,11 @@ function UserRow({ user, onRename, onToggleAdmin, onReject, onDelete }: any) {
         <Button size="sm" variant="outline" onClick={() => onRename(name)}>Guardar</Button>
         {user.is_admin && <Badge>Admin</Badge>}
         {user.status === "rejected" && <Badge variant="destructive">Rechazado</Badge>}
-        <Button size="sm" variant={user.is_admin ? "destructive" : "default"} onClick={onToggleAdmin}>
-          {user.is_admin ? "Quitar admin" : "Hacer admin"}
-        </Button>
+        {user.is_admin && (
+          <Button size="sm" variant="destructive" onClick={onToggleAdmin}>
+            Quitar admin
+          </Button>
+        )}
         {user.status === "approved" && !user.is_admin && (
           <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
         )}
