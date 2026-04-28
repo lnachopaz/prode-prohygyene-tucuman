@@ -8,6 +8,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Predictions from "./pages/Predictions";
+import MatchDetail from "./pages/MatchDetail";
 import Live from "./pages/Live";
 import Ranking from "./pages/Ranking";
 import Profile from "./pages/Profile";
@@ -29,6 +30,7 @@ const App = () => (
           <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/predictions" element={<Predictions />} />
+            <Route path="/match/:id" element={<MatchDetail />} />
             <Route path="/live" element={<Live />} />
             <Route path="/ranking" element={<Ranking />} />
             <Route path="/profile" element={<Profile />} />
