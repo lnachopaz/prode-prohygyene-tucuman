@@ -87,19 +87,6 @@ export default function Live() {
     },
   });
 
-  // Próximos partidos siguientes
-  const { data: upcoming } = useQuery({
-    queryKey: ["live-upcoming"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("matches")
-        .select("*")
-        .gt("kickoff_at", new Date().toISOString())
-        .order("kickoff_at")
-        .limit(5);
-      return data ?? [];
-    },
-  });
 
   if (isLoading) {
     return <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
