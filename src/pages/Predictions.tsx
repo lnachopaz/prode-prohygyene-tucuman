@@ -104,7 +104,9 @@ export default function Predictions() {
       if (predStatusFilter !== "all") {
         const p = predMap.get(m.id);
         const lockAt = subHours(new Date(m.kickoff_at), 1);
-        const locked = !isAfter(lockAt, now) || m.status !== "scheduled";
+        const mode = m.predictions_lock_mode ?? "auto";
+        const timeLocked = !isAfter(lockAt, now) || m.status !== "scheduled";
+        const locked = mode === "force_closed" || (mode === "auto" && timeLocked);
         if (predStatusFilter === "loaded" && !p) return false;
         if (predStatusFilter === "missing" && p) return false;
         if (predStatusFilter === "open" && locked) return false;
