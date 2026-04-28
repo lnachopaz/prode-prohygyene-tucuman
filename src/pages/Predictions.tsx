@@ -354,12 +354,21 @@ function MatchCard({
           </div>
         )}
 
-        {!locked && (
-          <Button size="sm" className="w-full" onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Guardar pronóstico
+        <div className="flex items-center gap-2 pt-1">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => navigate(`/match/${match.id}`)}
+          >
+            <Eye className="h-4 w-4 mr-2" /> Ver detalles
           </Button>
-        )}
+          {!locked && (
+            <Button size="sm" className="ml-auto" onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Guardar pronóstico
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
