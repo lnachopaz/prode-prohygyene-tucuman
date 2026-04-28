@@ -73,6 +73,37 @@ export default function Auth() {
     toast.success("Cuenta creada. Revisá tu email para verificarla.");
   }
 
+  if (pendingVerificationEmail) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+        <div className="w-full max-w-md">
+          <div className="flex flex-col items-center mb-8">
+            <img src={logo} alt="ProHygiene" className="h-16 w-auto mb-4" />
+          </div>
+          <Card className="shadow-lg">
+            <CardHeader className="items-center text-center">
+              <MailCheck className="h-12 w-12 text-primary mb-2" />
+              <CardTitle>Verificá tu email</CardTitle>
+              <CardDescription className="text-center">
+                Te enviamos un correo a <strong>{pendingVerificationEmail}</strong>. Hacé clic en el enlace para verificar tu cuenta.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm text-muted-foreground">
+                Después de verificar tu email, tu cuenta quedará pendiente de aprobación por un administrador.
+              </div>
+              <div className="flex justify-center">
+                <Button variant="outline" onClick={() => setPendingVerificationEmail(null)}>
+                  Volver
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
       <div className="w-full max-w-md">
