@@ -97,17 +97,19 @@ export default function Live() {
     },
   });
 
-  // Próximos partidos siguientes
-  const { data: upcoming } = useQuery({
-    queryKey: ["live-upcoming"],
+  // Mi pronóstico para el partido en vivo
+  const { data: myPred } = useQuery({
+    queryKey: ["live-my-pred", matchId, user?.id],
+    enabled: !!matchId && !!user,
+    refetchInterval: 30_000,
     queryFn: async () => {
       const { data } = await supabase
-        .from("matches")
-        .select("*")
-        .gt("kickoff_at", new Date().toISOString())
-        .order("kickoff_at")
-        .limit(5);
-      return data ?? [];
+        .from("predictions")
+        .select("pred_a, pred_b, points")
+        .eq("match_id", matchId!)
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return data;
     },
   });
 
