@@ -24,10 +24,12 @@ export default function Admin() {
         <TabsList>
           <TabsTrigger value="matches">Partidos</TabsTrigger>
           <TabsTrigger value="users">Usuarios</TabsTrigger>
+          <TabsTrigger value="predictions">Pronósticos</TabsTrigger>
           <TabsTrigger value="codes">Códigos admin</TabsTrigger>
         </TabsList>
         <TabsContent value="matches" className="mt-4"><MatchesAdmin /></TabsContent>
         <TabsContent value="users" className="mt-4"><UsersAdmin /></TabsContent>
+        <TabsContent value="predictions" className="mt-4"><PredictionsAdmin /></TabsContent>
         <TabsContent value="codes" className="mt-4"><CodesAdmin /></TabsContent>
       </Tabs>
     </div>
