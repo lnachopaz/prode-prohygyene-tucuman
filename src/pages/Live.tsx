@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,16 @@ import { MatchTimeline } from "@/components/MatchTimeline";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+function calcPoints(pa: number, pb: number, sa: number | null, sb: number | null) {
+  if (sa === null || sb === null) return 0;
+  if (pa === sa && pb === sb) return 3;
+  if (Math.sign(pa - pb) === Math.sign(sa - sb)) return 1;
+  return 0;
+}
+
 export default function Live() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [syncing, setSyncing] = useState(false);
 
   const syncLive = async (silent = false) => {
