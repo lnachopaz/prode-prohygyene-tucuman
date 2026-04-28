@@ -69,7 +69,8 @@ export default function Auth() {
     });
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success("Cuenta creada. Ya podés iniciar sesión.");
+    setPendingVerificationEmail(email);
+    toast.success("Cuenta creada. Revisá tu email para verificarla.");
   }
 
   return (
