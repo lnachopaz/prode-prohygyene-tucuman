@@ -284,6 +284,7 @@ export type Database = {
         Args: { pa: number; pb: number; sa: number; sb: number }
         Returns: number
       }
+      delete_user_completely: { Args: { _user_id: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -299,6 +299,15 @@ function UsersAdmin() {
     qc.invalidateQueries({ queryKey: ["admin-pending-detailed"] });
   }
 
+  async function deleteUser(userId: string, displayName: string) {
+    if (!confirm(`¿Eliminar definitivamente a "${displayName}"? Se borrarán todos sus datos (pronósticos, perfil y cuenta). El email quedará libre para registrarse de nuevo.`)) return;
+    const { error } = await supabase.rpc("delete_user_completely", { _user_id: userId });
+    if (error) return toast.error(error.message);
+    toast.success("Usuario eliminado");
+    qc.invalidateQueries({ queryKey: ["admin-users"] });
+    qc.invalidateQueries({ queryKey: ["admin-pending-detailed"] });
+  }
+
   if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-primary" />;
 
   const pending = pendingDetailed ?? [];
@@ -327,7 +336,8 @@ function UsersAdmin() {
                   <Badge variant="outline" className="gap-1">Email sin verificar</Badge>
                 )}
                 <Button size="sm" onClick={() => setStatus(u.id, "approved")}>Aprobar</Button>
-                <Button size="sm" variant="destructive" onClick={() => setStatus(u.id, "rejected")}>Rechazar</Button>
+                <Button size="sm" variant="outline" onClick={() => setStatus(u.id, "rejected")}>Rechazar</Button>
+                <Button size="sm" variant="destructive" onClick={() => deleteUser(u.id, u.display_name)}>Eliminar</Button>
               </CardContent>
             </Card>
           ))
@@ -343,6 +353,7 @@ function UsersAdmin() {
             onRename={(n: string) => rename(u.id, n)}
             onToggleAdmin={() => toggleAdmin(u.id, !u.is_admin)}
             onReject={() => setStatus(u.id, "rejected")}
+            onDelete={() => deleteUser(u.id, u.display_name)}
           />
         ))}
       </div>
@@ -350,7 +361,7 @@ function UsersAdmin() {
   );
 }
 
-function UserRow({ user, onRename, onToggleAdmin, onReject }: any) {
+function UserRow({ user, onRename, onToggleAdmin, onReject, onDelete }: any) {
   const [name, setName] = useState(user.display_name);
   return (
     <Card>
@@ -364,6 +375,9 @@ function UserRow({ user, onRename, onToggleAdmin, onReject }: any) {
         </Button>
         {user.status === "approved" && !user.is_admin && (
           <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
+        )}
+        {!user.is_admin && (
+          <Button size="sm" variant="destructive" onClick={onDelete}>Eliminar</Button>
         )}
       </CardContent>
     </Card>
