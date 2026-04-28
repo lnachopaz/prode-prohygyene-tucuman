@@ -306,6 +306,13 @@ export type Database = {
           id: string
         }[]
       }
+      list_users_with_email: {
+        Args: never
+        Returns: {
+          email: string
+          id: string
+        }[]
+      }
       recalc_match_points: { Args: { _match_id: string }; Returns: number }
       set_user_status: {
         Args: {

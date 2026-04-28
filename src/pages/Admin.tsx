@@ -257,9 +257,26 @@ function UsersAdmin() {
       const { data: profiles, error } = await supabase.from("profiles").select("*").order("display_name");
       if (error) throw error;
       const { data: roles } = await supabase.from("user_roles").select("*");
+      const { data: emails } = await supabase.rpc("list_users_with_email");
+      const { data: lb } = await supabase
+        .from("leaderboard")
+        .select("user_id, total_points, predictions_count")
+        .order("total_points", { ascending: false });
+      const rankMap = new Map<string, number>();
+      (lb ?? []).forEach((row: any, idx: number) => {
+        if (row.user_id) rankMap.set(row.user_id, idx + 1);
+      });
+      const lbMap = new Map<string, any>();
+      (lb ?? []).forEach((row: any) => row.user_id && lbMap.set(row.user_id, row));
+      const emailMap = new Map<string, string>();
+      (emails ?? []).forEach((row: any) => emailMap.set(row.id, row.email));
       return profiles.map((p) => ({
         ...p,
         is_admin: roles?.some((r) => r.user_id === p.id && r.role === "admin") ?? false,
+        email: emailMap.get(p.id) ?? "",
+        rank: rankMap.get(p.id) ?? null,
+        total_points: lbMap.get(p.id)?.total_points ?? 0,
+        predictions_count: lbMap.get(p.id)?.predictions_count ?? 0,
       }));
     },
   });
@@ -367,20 +384,30 @@ function UserRow({ user, onRename, onReject, onUnblock, onDelete }: any) {
   const [name, setName] = useState(user.display_name);
   return (
     <Card>
-      <CardContent className="p-3 flex flex-wrap items-center gap-2">
-        <Input className="flex-1 min-w-[180px]" value={name} onChange={(e) => setName(e.target.value)} />
-        <Button size="sm" variant="outline" onClick={() => onRename(name)}>Guardar</Button>
-        {user.is_admin && <Badge>Admin</Badge>}
-        {user.status === "rejected" && <Badge variant="destructive">Bloqueado</Badge>}
-        {user.status === "approved" && !user.is_admin && (
-          <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
-        )}
-        {user.status === "rejected" && (
-          <Button size="sm" onClick={onUnblock}>Desbloquear</Button>
-        )}
-        {!user.is_admin && (
-          <Button size="sm" variant="destructive" onClick={onDelete}>Eliminar</Button>
-        )}
+      <CardContent className="p-3 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Input className="flex-1 min-w-[180px]" value={name} onChange={(e) => setName(e.target.value)} />
+          <Button size="sm" variant="outline" onClick={() => onRename(name)}>Guardar</Button>
+          {user.is_admin && <Badge>Admin</Badge>}
+          {user.status === "rejected" && <Badge variant="destructive">Bloqueado</Badge>}
+          {user.status === "approved" && !user.is_admin && (
+            <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
+          )}
+          {user.status === "rejected" && (
+            <Button size="sm" onClick={onUnblock}>Desbloquear</Button>
+          )}
+          {!user.is_admin && (
+            <Button size="sm" variant="destructive" onClick={onDelete}>Eliminar</Button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <span>📧 {user.email || "—"}</span>
+          <Badge variant="outline">
+            {user.rank ? `#${user.rank} en ranking` : "Sin ranking"}
+            {user.rank ? ` · ${user.total_points} pts` : ""}
+          </Badge>
+          <Badge variant="outline">{user.predictions_count} pronósticos</Badge>
+        </div>
       </CardContent>
     </Card>
   );
