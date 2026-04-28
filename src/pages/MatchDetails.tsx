@@ -187,6 +187,23 @@ export default function MatchDetails() {
         </CardContent>
       </Card>
 
+      {!roundOpen && unlockTrigger && (
+        <Card className="border-dashed">
+          <CardContent className="p-4 space-y-2 text-center">
+            <div className="flex items-center justify-center gap-2 text-sm">
+              <Lock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">
+                Esta ronda todavía no está disponible. Se desbloquea cuando arranque{" "}
+                <strong className="text-foreground">{unlockTrigger.prevRoundLabel}</strong>.
+              </span>
+            </div>
+            <div className="flex justify-center">
+              <Countdown to={unlockTrigger.unlocksAt} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div>
         <h2 className="text-xl font-bold mb-3">Pronósticos de los jugadores</h2>
         {!locked ? (
