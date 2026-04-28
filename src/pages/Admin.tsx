@@ -369,14 +369,12 @@ function UserRow({ user, onRename, onToggleAdmin, onReject, onDelete }: any) {
         <Input className="flex-1 min-w-[180px]" value={name} onChange={(e) => setName(e.target.value)} />
         <Button size="sm" variant="outline" onClick={() => onRename(name)}>Guardar</Button>
         {user.is_admin && <Badge>Admin</Badge>}
-        {user.status === "rejected" && <Badge variant="destructive">Rechazado</Badge>}
-        {user.is_admin && (
-          <Button size="sm" variant="destructive" onClick={onToggleAdmin}>
-            Quitar admin
-          </Button>
-        )}
+        {user.status === "rejected" && <Badge variant="destructive">Bloqueado</Badge>}
         {user.status === "approved" && !user.is_admin && (
           <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
+        )}
+        {user.status === "rejected" && (
+          <Button size="sm" onClick={onUnblock}>Desbloquear</Button>
         )}
         {!user.is_admin && (
           <Button size="sm" variant="destructive" onClick={onDelete}>Eliminar</Button>
