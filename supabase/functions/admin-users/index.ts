@@ -55,6 +55,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "update_status") {
+      const targetId = body.user_id as string;
+      const status = body.status as "approved" | "rejected" | "pending";
+      if (!targetId) throw new Error("user_id requerido");
+      if (!["approved", "rejected", "pending"].includes(status)) {
+        throw new Error("status inválido");
+      }
+
+      const { error } = await admin.from("profiles").update({ status }).eq("id", targetId);
+      if (error) throw error;
+
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "delete_user") {
       const targetId = body.user_id as string;
       if (!targetId) throw new Error("user_id requerido");
