@@ -72,15 +72,18 @@ export default function MatchDetails() {
       if (userIds.length > 0) {
         const { data: profs, error: pErr } = await supabase
           .from("profiles")
-          .select("id, display_name, avatar_url")
-          .in("id", userIds);
+          .select("id, display_name, avatar_url, status")
+          .in("id", userIds)
+          .neq("status", "rejected");
         if (pErr) throw pErr;
         profs?.forEach((p) => profilesMap.set(p.id, { display_name: p.display_name, avatar_url: p.avatar_url }));
       }
-      return (preds ?? []).map((p) => ({
-        ...p,
-        profiles: profilesMap.get(p.user_id) ?? null,
-      })) as PredictionRow[];
+      return (preds ?? [])
+        .filter((p) => profilesMap.has(p.user_id))
+        .map((p) => ({
+          ...p,
+          profiles: profilesMap.get(p.user_id) ?? null,
+        })) as PredictionRow[];
     },
   });
 
