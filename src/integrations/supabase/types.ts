@@ -89,7 +89,7 @@ export type Database = {
           group_name: string | null
           id: string
           kickoff_at: string
-          predictions_locked: boolean
+          predictions_lock_mode: Database["public"]["Enums"]["lock_mode"]
           score_a: number | null
           score_b: number | null
           stage: string
@@ -108,7 +108,7 @@ export type Database = {
           group_name?: string | null
           id?: string
           kickoff_at: string
-          predictions_locked?: boolean
+          predictions_lock_mode?: Database["public"]["Enums"]["lock_mode"]
           score_a?: number | null
           score_b?: number | null
           stage?: string
@@ -127,7 +127,7 @@ export type Database = {
           group_name?: string | null
           id?: string
           kickoff_at?: string
-          predictions_locked?: boolean
+          predictions_lock_mode?: Database["public"]["Enums"]["lock_mode"]
           score_a?: number | null
           score_b?: number | null
           stage?: string
@@ -306,6 +306,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      lock_mode: "auto" | "force_open" | "force_closed"
       match_status: "scheduled" | "live" | "finished"
       user_status: "pending" | "approved" | "rejected"
     }
@@ -436,6 +437,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      lock_mode: ["auto", "force_open", "force_closed"],
       match_status: ["scheduled", "live", "finished"],
       user_status: ["pending", "approved", "rejected"],
     },
