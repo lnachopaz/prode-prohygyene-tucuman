@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save, Lock, X, Eye } from "lucide-react";
+import { Loader2, Save, Lock, X, Eye, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { format, isAfter, subHours } from "date-fns";
 import { es } from "date-fns/locale";
@@ -368,8 +368,14 @@ function MatchCard({
           </Button>
           {!locked && (
             <Button size="sm" className="ml-auto" onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              Guardar pronóstico
+              {saving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : prediction ? (
+                <Pencil className="h-4 w-4 mr-2" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              {prediction ? "Editar pronóstico" : "Guardar pronóstico"}
             </Button>
           )}
         </div>
