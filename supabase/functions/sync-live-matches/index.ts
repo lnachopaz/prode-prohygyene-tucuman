@@ -94,9 +94,10 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ updated: results.filter((r) => r.ok).length, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (e) {
-    console.error("sync-live-matches error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {
+  } catch (e: any) {
+    const msg = e?.message || e?.error_description || (typeof e === "string" ? e : JSON.stringify(e));
+    console.error("sync-live-matches error:", msg, e);
+    return new Response(JSON.stringify({ error: msg, code: e?.code }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
