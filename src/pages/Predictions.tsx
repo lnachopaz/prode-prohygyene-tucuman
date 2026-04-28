@@ -119,8 +119,15 @@ export default function Predictions() {
 
   const grouped = useMemo(() => {
     const byDate = new Map<string, Match[]>();
+    // Agrupamos por fecha en horario Argentina para evitar desfasajes según la zona del navegador
+    const fmtKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Argentina/Buenos_Aires",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
     filtered.forEach((m) => {
-      const key = format(new Date(m.kickoff_at), "yyyy-MM-dd");
+      const key = fmtKey.format(new Date(m.kickoff_at)); // YYYY-MM-DD en AR
       const arr = byDate.get(key) ?? [];
       arr.push(m);
       byDate.set(key, arr);
