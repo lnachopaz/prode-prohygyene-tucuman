@@ -52,23 +52,51 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("FOOTBALL_DATA_API_KEY");
     if (!apiKey) throw new Error("FOOTBALL_DATA_API_KEY not configured");
 
-    const { data: matches, error } = await admin
+    // Solo sincronizamos partidos relevantes para evitar rate limit (HTTP 429):
+    // - Status 'live'
+    // - Status 'scheduled' cuyo kickoff esté entre hace 4h y dentro de 30min
+    //   (cubre partidos que están por empezar y los que ya empezaron pero la sync aún no marcó como 'live')
+    const nowIso = new Date().toISOString();
+    const soonIso = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    const recentPastIso = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+
+    const { data: liveMatches, error: liveErr } = await admin
       .from("matches")
       .select("id, external_id, status")
-      .like("external_id", "fd-%");
+      .like("external_id", "fd-%")
+      .eq("status", "live");
+    if (liveErr) throw liveErr;
 
-    if (error) throw error;
-    if (!matches || matches.length === 0) {
-      await finishLog({ status: "success", updated_count: 0, details: { message: "no linked matches" } });
+    const { data: soonMatches, error: soonErr } = await admin
+      .from("matches")
+      .select("id, external_id, status")
+      .like("external_id", "fd-%")
+      .eq("status", "scheduled")
+      .gte("kickoff_at", recentPastIso)
+      .lte("kickoff_at", soonIso);
+    if (soonErr) throw soonErr;
+
+    const seen = new Set<string>();
+    const matches = [...(liveMatches ?? []), ...(soonMatches ?? [])].filter((m) => {
+      if (seen.has(m.id)) return false;
+      seen.add(m.id);
+      return true;
+    });
+
+    if (matches.length === 0) {
+      await finishLog({ status: "success", updated_count: 0, details: { message: "no relevant matches now", checked_at: nowIso } });
       return new Response(
-        JSON.stringify({ updated: 0, message: "No hay partidos vinculados a Football-Data." }),
+        JSON.stringify({ updated: 0, message: "No hay partidos en vivo ni próximos a sincronizar." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const results: Array<{ id: string; ok: boolean; status?: string; score?: string; events?: number; error?: string }> = [];
 
-    for (const m of matches) {
+    for (let idx = 0; idx < matches.length; idx++) {
+      const m = matches[idx];
+      // Pequeño delay entre requests para respetar el rate limit (~10 req/min en plan free)
+      if (idx > 0) await new Promise((r) => setTimeout(r, 6500));
       const fdId = m.external_id!.replace(/^fd-/, "");
       try {
         const r = await fetch(`${FD_BASE}/matches/${fdId}`, {
