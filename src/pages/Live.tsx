@@ -153,10 +153,6 @@ export default function Live() {
           </h1>
           <p className="text-muted-foreground">Seguí el partido en vivo y los pronósticos del grupo.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => syncLive(false)} disabled={syncing}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-          Actualizar
-        </Button>
       </div>
 
       {/* Match card */}
