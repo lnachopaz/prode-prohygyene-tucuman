@@ -645,7 +645,7 @@ function TestModeAdmin() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("matches")
-        .select("id, team_a, team_b, status, score_a, score_b, kickoff_at, predictions_lock_mode")
+        .select("id, team_a, team_b, status, score_a, score_b, kickoff_at, predictions_lock_mode, test_mode")
         .order("kickoff_at");
       if (error) throw error;
       return data;
@@ -659,19 +659,34 @@ function TestModeAdmin() {
     qc.invalidateQueries({ queryKey: ["leaderboard"] });
   }
 
+  async function enableTestMode(id: string) {
+    const { error } = await supabase.from("matches").update({ test_mode: true }).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("🧪 Modo prueba activado · el sync automático no tocará este partido");
+    refresh();
+  }
+
+  async function disableTestMode(id: string) {
+    const { error } = await supabase.from("matches").update({ test_mode: false }).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("✅ Modo prueba desactivado · vuelve al sync automático");
+    refresh();
+  }
+
   async function setLive(id: string) {
+    // Activamos test_mode al pasar a vivo manualmente para que el sync no lo sobrescriba.
     const { error } = await supabase.from("matches").update({
-      status: "live", score_a: 0, score_b: 0,
+      status: "live", score_a: 0, score_b: 0, test_mode: true,
     }).eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("⚽ Partido marcado EN VIVO (0-0)");
+    toast.success("⚽ EN VIVO (0-0) · modo prueba activado");
     refresh();
   }
 
   async function addGoal(id: string, side: "a" | "b", current: { score_a: number | null; score_b: number | null }) {
     const score_a = (current.score_a ?? 0) + (side === "a" ? 1 : 0);
     const score_b = (current.score_b ?? 0) + (side === "b" ? 1 : 0);
-    const { error } = await supabase.from("matches").update({ score_a, score_b }).eq("id", id);
+    const { error } = await supabase.from("matches").update({ score_a, score_b, test_mode: true }).eq("id", id);
     if (error) return toast.error(error.message);
     toast.success(`Gol ${side === "a" ? "local" : "visitante"} → ${score_a}-${score_b}`);
     refresh();
@@ -685,11 +700,12 @@ function TestModeAdmin() {
   }
 
   async function reset(id: string) {
+    // Al resetear, también desactivamos el modo prueba para que el sync vuelva a tomarlo.
     const { error } = await supabase.from("matches").update({
-      status: "scheduled", score_a: null, score_b: null,
+      status: "scheduled", score_a: null, score_b: null, test_mode: false,
     }).eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("↩️ Partido reseteado a programado");
+    toast.success("↩️ Reseteado · modo prueba desactivado");
     refresh();
   }
 
@@ -697,9 +713,9 @@ function TestModeAdmin() {
     const scheduled = (matches ?? []).filter((m: any) => m.status === "scheduled").slice(0, 2);
     if (scheduled.length < 2) return toast.error("Necesitás al menos 2 partidos programados");
     for (const m of scheduled) {
-      await supabase.from("matches").update({ status: "live", score_a: 0, score_b: 0 }).eq("id", m.id);
+      await supabase.from("matches").update({ status: "live", score_a: 0, score_b: 0, test_mode: true }).eq("id", m.id);
     }
-    toast.success("⚽⚽ 2 partidos simultáneos en vivo (0-0)");
+    toast.success("⚽⚽ 2 partidos simultáneos en vivo (modo prueba)");
     refresh();
   }
 
@@ -707,7 +723,7 @@ function TestModeAdmin() {
     const live = (matches ?? []).filter((m: any) => m.status === "live");
     if (live.length === 0) return toast.error("No hay partidos en vivo");
     for (const m of live) {
-      await supabase.from("matches").update({ status: "scheduled", score_a: null, score_b: null }).eq("id", m.id);
+      await supabase.from("matches").update({ status: "scheduled", score_a: null, score_b: null, test_mode: false }).eq("id", m.id);
     }
     toast.success(`↩️ ${live.length} partidos reseteados`);
     refresh();
