@@ -178,6 +178,11 @@ export default function Live() {
         </CardContent>
       </Card>
 
+      {/* Timeline de eventos en vivo */}
+      {started && (
+        <MatchTimeline matchId={m.id} teamA={m.team_a} teamB={m.team_b} />
+      )}
+
       {/* Pronósticos */}
       <Card>
         <CardHeader>
