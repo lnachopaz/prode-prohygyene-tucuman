@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const results: Array<{ id: string; ok: boolean; status?: string; score?: string; goals?: number; error?: string }> = [];
+    const results: Array<{ id: string; ok: boolean; status?: string; score?: string; error?: string }> = [];
 
     // Football-Data free: 10 req/min => 6s entre llamadas. Usamos 6.5s para margen.
     const DELAY_MS = matches.length > 1 ? 6500 : 0;
@@ -123,36 +123,11 @@ Deno.serve(async (req) => {
             .eq("id", m.id);
           if (upErr) throw upErr;
 
-          // Sincronizar goles (eventos)
-          let goalsCount = 0;
-          const goals = Array.isArray(data.goals) ? data.goals : [];
-          if (goals.length > 0) {
-            // Borrar eventos previos del partido y reinsertar (idempotente)
-            await admin.from("match_events").delete().eq("match_id", m.id).eq("type", "goal");
-
-            const eventsToInsert = goals.map((g: any) => ({
-              match_id: m.id,
-              type: "goal",
-              minute: g.minute ?? 0,
-              team: g.team?.name ?? "",
-              player: g.scorer?.name ?? null,
-              score_home: g.score?.home ?? null,
-              score_away: g.score?.away ?? null,
-              external_id: g.scorer?.id ? `fd-goal-${fdId}-${g.minute}-${g.scorer.id}` : null,
-            }));
-
-            if (eventsToInsert.length > 0) {
-              const { error: evErr } = await admin.from("match_events").insert(eventsToInsert);
-              if (!evErr) goalsCount = eventsToInsert.length;
-            }
-          }
-
           results.push({
             id: m.id,
             ok: true,
             status: newStatus,
             score: `${score_a ?? 0}-${score_b ?? 0}`,
-            goals: goalsCount,
           });
         }
       } catch (e) {
