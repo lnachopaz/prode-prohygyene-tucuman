@@ -31,7 +31,7 @@ type Match = {
   status: "scheduled" | "live" | "finished";
   score_a: number | null;
   score_b: number | null;
-  predictions_locked?: boolean;
+  predictions_lock_mode?: "auto" | "force_open" | "force_closed";
 };
 
 type Prediction = {
