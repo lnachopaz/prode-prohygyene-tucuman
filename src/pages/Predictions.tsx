@@ -259,8 +259,11 @@ function MatchCard({
     const t = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(t);
   }, []);
-  const lockedByAdmin = !!match.predictions_locked;
-  const locked = lockedByAdmin || !isAfter(lockAt, now) || match.status !== "scheduled";
+  const lockMode = match.predictions_lock_mode ?? "auto";
+  const timeLocked = !isAfter(lockAt, now) || match.status !== "scheduled";
+  const lockedByAdmin = lockMode === "force_closed";
+  const forcedOpen = lockMode === "force_open" && match.status === "scheduled";
+  const locked = lockedByAdmin || (!forcedOpen && timeLocked);
 
   const [a, setA] = useState<string>(prediction?.pred_a?.toString() ?? "");
   const [b, setB] = useState<string>(prediction?.pred_b?.toString() ?? "");
