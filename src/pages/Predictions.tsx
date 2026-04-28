@@ -355,6 +355,20 @@ function MatchCard({
           <TeamSide name={match.team_b} flag={match.team_b_flag} align="start" />
         </div>
 
+        {!roundOpen && unlockTrigger && (
+          <div className="rounded-md border border-dashed bg-muted/40 px-3 py-2 text-xs space-y-1">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Lock className="h-3.5 w-3.5" />
+              <span>
+                Se desbloquea cuando arranque <strong className="text-foreground">{unlockTrigger.prevRoundLabel}</strong>
+              </span>
+            </div>
+            <div className="flex justify-center">
+              <Countdown to={unlockTrigger.unlocksAt} />
+            </div>
+          </div>
+        )}
+
         {match.status === "finished" && (
           <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
             <span className="text-muted-foreground">
