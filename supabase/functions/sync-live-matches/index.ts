@@ -56,16 +56,19 @@ Deno.serve(async (req) => {
     const soonIso = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
     const recentPastIso = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString();
 
+    // Excluimos partidos en modo prueba: el admin los maneja manualmente.
     const { data: liveMatches } = await admin
       .from("matches")
       .select("id, team_a, team_b, external_id, status")
       .eq("status", "live")
+      .eq("test_mode", false)
       .not("external_id", "is", null);
 
     const { data: soonMatches } = await admin
       .from("matches")
       .select("id, team_a, team_b, external_id, status")
       .eq("status", "scheduled")
+      .eq("test_mode", false)
       .gte("kickoff_at", recentPastIso)
       .lte("kickoff_at", soonIso)
       .not("external_id", "is", null);

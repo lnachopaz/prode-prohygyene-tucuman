@@ -645,7 +645,7 @@ function TestModeAdmin() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("matches")
-        .select("id, team_a, team_b, status, score_a, score_b, kickoff_at, predictions_lock_mode")
+        .select("id, team_a, team_b, status, score_a, score_b, kickoff_at, predictions_lock_mode, test_mode")
         .order("kickoff_at");
       if (error) throw error;
       return data;
@@ -659,19 +659,34 @@ function TestModeAdmin() {
     qc.invalidateQueries({ queryKey: ["leaderboard"] });
   }
 
+  async function enableTestMode(id: string) {
+    const { error } = await supabase.from("matches").update({ test_mode: true }).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("🧪 Modo prueba activado · el sync automático no tocará este partido");
+    refresh();
+  }
+
+  async function disableTestMode(id: string) {
+    const { error } = await supabase.from("matches").update({ test_mode: false }).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("✅ Modo prueba desactivado · vuelve al sync automático");
+    refresh();
+  }
+
   async function setLive(id: string) {
+    // Activamos test_mode al pasar a vivo manualmente para que el sync no lo sobrescriba.
     const { error } = await supabase.from("matches").update({
-      status: "live", score_a: 0, score_b: 0,
+      status: "live", score_a: 0, score_b: 0, test_mode: true,
     }).eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("⚽ Partido marcado EN VIVO (0-0)");
+    toast.success("⚽ EN VIVO (0-0) · modo prueba activado");
     refresh();
   }
 
   async function addGoal(id: string, side: "a" | "b", current: { score_a: number | null; score_b: number | null }) {
     const score_a = (current.score_a ?? 0) + (side === "a" ? 1 : 0);
     const score_b = (current.score_b ?? 0) + (side === "b" ? 1 : 0);
-    const { error } = await supabase.from("matches").update({ score_a, score_b }).eq("id", id);
+    const { error } = await supabase.from("matches").update({ score_a, score_b, test_mode: true }).eq("id", id);
     if (error) return toast.error(error.message);
     toast.success(`Gol ${side === "a" ? "local" : "visitante"} → ${score_a}-${score_b}`);
     refresh();
@@ -685,11 +700,12 @@ function TestModeAdmin() {
   }
 
   async function reset(id: string) {
+    // Al resetear, también desactivamos el modo prueba para que el sync vuelva a tomarlo.
     const { error } = await supabase.from("matches").update({
-      status: "scheduled", score_a: null, score_b: null,
+      status: "scheduled", score_a: null, score_b: null, test_mode: false,
     }).eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("↩️ Partido reseteado a programado");
+    toast.success("↩️ Reseteado · modo prueba desactivado");
     refresh();
   }
 
@@ -697,9 +713,9 @@ function TestModeAdmin() {
     const scheduled = (matches ?? []).filter((m: any) => m.status === "scheduled").slice(0, 2);
     if (scheduled.length < 2) return toast.error("Necesitás al menos 2 partidos programados");
     for (const m of scheduled) {
-      await supabase.from("matches").update({ status: "live", score_a: 0, score_b: 0 }).eq("id", m.id);
+      await supabase.from("matches").update({ status: "live", score_a: 0, score_b: 0, test_mode: true }).eq("id", m.id);
     }
-    toast.success("⚽⚽ 2 partidos simultáneos en vivo (0-0)");
+    toast.success("⚽⚽ 2 partidos simultáneos en vivo (modo prueba)");
     refresh();
   }
 
@@ -707,7 +723,7 @@ function TestModeAdmin() {
     const live = (matches ?? []).filter((m: any) => m.status === "live");
     if (live.length === 0) return toast.error("No hay partidos en vivo");
     for (const m of live) {
-      await supabase.from("matches").update({ status: "scheduled", score_a: null, score_b: null }).eq("id", m.id);
+      await supabase.from("matches").update({ status: "scheduled", score_a: null, score_b: null, test_mode: false }).eq("id", m.id);
     }
     toast.success(`↩️ ${live.length} partidos reseteados`);
     refresh();
@@ -756,7 +772,12 @@ function TestModeAdmin() {
               <Card key={m.id}>
                 <CardContent className="p-3 flex flex-wrap items-center gap-2">
                   <div className="flex-1 min-w-[200px]">
-                    <div className="font-semibold">{m.team_a} vs {m.team_b}</div>
+                    <div className="font-semibold flex items-center gap-2">
+                      {m.team_a} vs {m.team_b}
+                      {m.test_mode && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 font-medium">🧪 PRUEBA</span>
+                      )}
+                    </div>
                     <div className="text-2xl font-mono mt-1">{m.score_a ?? 0} - {m.score_b ?? 0}</div>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => addGoal(m.id, "a", m)}>
@@ -768,6 +789,15 @@ function TestModeAdmin() {
                   <Button size="sm" onClick={() => finish(m.id)}>
                     <Square className="h-4 w-4 mr-1" />Finalizar
                   </Button>
+                  {m.test_mode ? (
+                    <Button size="sm" variant="outline" onClick={() => disableTestMode(m.id)} title="Desactivar modo prueba (vuelve al sync automático)">
+                      ✅ Salir prueba
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => enableTestMode(m.id)} title="Activar modo prueba (el sync no lo tocará)">
+                      🧪 Activar prueba
+                    </Button>
+                  )}
                   <Button size="sm" variant="ghost" onClick={() => reset(m.id)}>
                     <RotateCcw className="h-4 w-4" />
                   </Button>
@@ -787,8 +817,22 @@ function TestModeAdmin() {
               <CardContent className="p-3 flex flex-wrap items-center gap-2">
                 <div className="flex-1 min-w-[200px]">
                   <div className="text-xs text-muted-foreground">{format(new Date(m.kickoff_at), "dd/MM HH:mm")}</div>
-                  <div className="font-medium">{m.team_a} vs {m.team_b}</div>
+                  <div className="font-medium flex items-center gap-2">
+                    {m.team_a} vs {m.team_b}
+                    {m.test_mode && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 font-medium">🧪 PRUEBA</span>
+                    )}
+                  </div>
                 </div>
+                {m.test_mode ? (
+                  <Button size="sm" variant="outline" onClick={() => disableTestMode(m.id)}>
+                    ✅ Salir prueba
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => enableTestMode(m.id)}>
+                    🧪 Activar prueba
+                  </Button>
+                )}
                 <Button size="sm" onClick={() => setLive(m.id)}>
                   <Play className="h-4 w-4 mr-1" />Marcar en vivo
                 </Button>
