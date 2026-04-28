@@ -99,6 +99,7 @@ function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }
   const [busy, setBusy] = useState(false);
   const [recalcBusy, setRecalcBusy] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
+  const lockMode: "auto" | "force_open" | "force_closed" = match.predictions_lock_mode ?? "auto";
 
   async function save() {
     setBusy(true);
