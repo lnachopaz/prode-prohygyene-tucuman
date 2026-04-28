@@ -31,6 +31,7 @@ type Match = {
   status: "scheduled" | "live" | "finished";
   score_a: number | null;
   score_b: number | null;
+  predictions_locked?: boolean;
 };
 
 type Prediction = {
@@ -256,7 +257,8 @@ function MatchCard({
     const t = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(t);
   }, []);
-  const locked = !isAfter(lockAt, now) || match.status !== "scheduled";
+  const lockedByAdmin = !!match.predictions_locked;
+  const locked = lockedByAdmin || !isAfter(lockAt, now) || match.status !== "scheduled";
 
   const [a, setA] = useState<string>(prediction?.pred_a?.toString() ?? "");
   const [b, setB] = useState<string>(prediction?.pred_b?.toString() ?? "");
@@ -292,6 +294,7 @@ function MatchCard({
   const statusBadge = () => {
     if (match.status === "live") return <Badge className="bg-destructive text-destructive-foreground">EN VIVO</Badge>;
     if (match.status === "finished") return <Badge variant="secondary">Finalizado</Badge>;
+    if (lockedByAdmin) return <Badge variant="destructive" className="gap-1"><Lock className="h-3 w-3" /> Bloqueado por admin</Badge>;
     if (locked) return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Cerrado</Badge>;
     return <Badge variant="outline">{format(new Date(match.kickoff_at), "HH:mm")}</Badge>;
   };

@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,16 @@ import { MatchTimeline } from "@/components/MatchTimeline";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+function calcPoints(pa: number, pb: number, sa: number | null, sb: number | null) {
+  if (sa === null || sb === null) return 0;
+  if (pa === sa && pb === sb) return 3;
+  if (Math.sign(pa - pb) === Math.sign(sa - sb)) return 1;
+  return 0;
+}
+
 export default function Live() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [syncing, setSyncing] = useState(false);
 
   const syncLive = async (silent = false) => {
@@ -88,17 +97,19 @@ export default function Live() {
     },
   });
 
-  // Próximos partidos siguientes
-  const { data: upcoming } = useQuery({
-    queryKey: ["live-upcoming"],
+  // Mi pronóstico para el partido en vivo
+  const { data: myPred } = useQuery({
+    queryKey: ["live-my-pred", matchId, user?.id],
+    enabled: !!matchId && !!user,
+    refetchInterval: 30_000,
     queryFn: async () => {
       const { data } = await supabase
-        .from("matches")
-        .select("*")
-        .gt("kickoff_at", new Date().toISOString())
-        .order("kickoff_at")
-        .limit(5);
-      return data ?? [];
+        .from("predictions")
+        .select("pred_a, pred_b, points")
+        .eq("match_id", matchId!)
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return data;
     },
   });
 
@@ -173,6 +184,29 @@ export default function Live() {
           {!started && (
             <div className="mt-6 flex justify-center">
               <Countdown to={m.kickoff_at} />
+            </div>
+          )}
+
+          {started && (
+            <div className="mt-6 rounded-md border bg-muted/40 p-3 text-sm">
+              {myPred ? (() => {
+                const partial = calcPoints(myPred.pred_a, myPred.pred_b, m.score_a, m.score_b);
+                return (
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-muted-foreground">
+                      Tu pronóstico: <strong className="text-foreground tabular-nums">{myPred.pred_a} - {myPred.pred_b}</strong>
+                    </span>
+                    <span>
+                      <span className="text-muted-foreground mr-2">{m.status === "finished" ? "Final:" : "Parcial:"}</span>
+                      {partial === 3 ? <Badge className="bg-success text-success-foreground">+3 pts</Badge>
+                        : partial === 1 ? <Badge variant="secondary">+1 pt</Badge>
+                        : <Badge variant="outline">0 pts</Badge>}
+                    </span>
+                  </div>
+                );
+              })() : (
+                <p className="text-muted-foreground text-center">No pronosticaste este partido.</p>
+              )}
             </div>
           )}
         </CardContent>

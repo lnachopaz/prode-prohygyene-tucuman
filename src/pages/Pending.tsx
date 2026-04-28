@@ -2,7 +2,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth, signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Clock, XCircle } from "lucide-react";
+import { Loader2, Clock, XCircle, MailCheck } from "lucide-react";
 import logo from "@/assets/prohygiene-logo.png";
 
 export default function Pending() {
@@ -41,8 +41,19 @@ export default function Pending() {
                 : "Tu cuenta está pendiente de aprobación por un administrador. Te avisaremos cuando puedas ingresar."}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center">
-            <Button variant="outline" onClick={() => signOut()}>Cerrar sesión</Button>
+          <CardContent className="space-y-4">
+            {!rejected && (
+              <div className="flex items-start gap-2 rounded-md border border-success/30 bg-success/10 p-3 text-sm">
+                <MailCheck className="h-5 w-5 text-success shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-success">Email verificado</p>
+                  <p className="text-muted-foreground text-xs">Solo falta que un administrador apruebe tu cuenta.</p>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-center">
+              <Button variant="outline" onClick={() => signOut()}>Cerrar sesión</Button>
+            </div>
           </CardContent>
         </Card>
       </div>

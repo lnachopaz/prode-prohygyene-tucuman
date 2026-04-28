@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -25,6 +25,21 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [adminCode, setAdminCode] = useState("");
+
+  // Detectar callback de confirmación de email (Supabase devuelve type=signup en hash o query)
+  useEffect(() => {
+    const hash = window.location.hash || "";
+    const search = window.location.search || "";
+    const isConfirmation =
+      hash.includes("type=signup") ||
+      hash.includes("access_token=") ||
+      search.includes("type=signup");
+    if (isConfirmation) {
+      toast.success("✅ Email confirmado. Tu cuenta queda pendiente de aprobación del admin.");
+      // limpiar la URL para no repetir el toast
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   if (loading) return null;
   if (user) return <Navigate to="/" replace />;

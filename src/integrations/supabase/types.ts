@@ -89,6 +89,7 @@ export type Database = {
           group_name: string | null
           id: string
           kickoff_at: string
+          predictions_locked: boolean
           score_a: number | null
           score_b: number | null
           stage: string
@@ -107,6 +108,7 @@ export type Database = {
           group_name?: string | null
           id?: string
           kickoff_at: string
+          predictions_locked?: boolean
           score_a?: number | null
           score_b?: number | null
           stage?: string
@@ -125,6 +127,7 @@ export type Database = {
           group_name?: string | null
           id?: string
           kickoff_at?: string
+          predictions_locked?: boolean
           score_a?: number | null
           score_b?: number | null
           stage?: string
@@ -207,6 +210,39 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_logs: {
+        Row: {
+          details: Json | null
+          error_message: string | null
+          finished_at: string | null
+          function_name: string
+          id: string
+          started_at: string
+          status: string
+          updated_count: number
+        }
+        Insert: {
+          details?: Json | null
+          error_message?: string | null
+          finished_at?: string | null
+          function_name: string
+          id?: string
+          started_at?: string
+          status?: string
+          updated_count?: number
+        }
+        Update: {
+          details?: Json | null
+          error_message?: string | null
+          finished_at?: string | null
+          function_name?: string
+          id?: string
+          started_at?: string
+          status?: string
+          updated_count?: number
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -256,6 +292,17 @@ export type Database = {
         Returns: boolean
       }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      list_pending_signups: {
+        Args: never
+        Returns: {
+          created_at: string
+          display_name: string
+          email: string
+          email_confirmed_at: string
+          id: string
+        }[]
+      }
+      recalc_match_points: { Args: { _match_id: string }; Returns: number }
     }
     Enums: {
       app_role: "admin" | "user"
