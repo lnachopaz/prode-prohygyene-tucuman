@@ -19,6 +19,8 @@ import { toast } from "sonner";
 import { format, isAfter, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
+import { getUnlockTrigger, isRoundUnlocked } from "@/lib/unlock";
+import { Countdown } from "@/components/Countdown";
 
 type Match = {
   id: string;
@@ -104,11 +106,14 @@ export default function Predictions() {
       if (predStatusFilter !== "all") {
         const p = predMap.get(m.id);
         const lockAt = subHours(new Date(m.kickoff_at), 1);
-        const locked = !isAfter(lockAt, now) || m.status !== "scheduled";
+        const timeLocked = !isAfter(lockAt, now) || m.status !== "scheduled";
+        const roundOpen = isRoundUnlocked(m, matches, now);
+        const locked = timeLocked || !roundOpen;
         if (predStatusFilter === "loaded" && !p) return false;
         if (predStatusFilter === "missing" && p) return false;
-        if (predStatusFilter === "open" && locked) return false;
-        if (predStatusFilter === "locked" && !locked) return false;
+        if (predStatusFilter === "open" && (locked || !roundOpen)) return false;
+        if (predStatusFilter === "locked" && !timeLocked) return false;
+        if (predStatusFilter === "round_locked" && roundOpen) return false;
         if (predStatusFilter === "finished" && m.status !== "finished") return false;
       }
       return true;
@@ -184,7 +189,8 @@ export default function Predictions() {
             <SelectItem value="loaded">Pronóstico cargado</SelectItem>
             <SelectItem value="missing">Sin pronóstico</SelectItem>
             <SelectItem value="open">Abiertos</SelectItem>
-            <SelectItem value="locked">Cerrados</SelectItem>
+            <SelectItem value="locked">Cerrados (1h antes)</SelectItem>
+            <SelectItem value="round_locked">Bloqueados por ronda</SelectItem>
             <SelectItem value="finished">Finalizados</SelectItem>
           </SelectContent>
         </Select>
@@ -231,6 +237,7 @@ export default function Predictions() {
                   <MatchCard
                     key={m.id}
                     match={matchWithFlags}
+                    allMatches={matches!}
                     prediction={predMap.get(m.id)}
                     onSaved={() => qc.invalidateQueries({ queryKey: ["my-preds"] })}
                   />
@@ -246,10 +253,12 @@ export default function Predictions() {
 
 function MatchCard({
   match,
+  allMatches,
   prediction,
   onSaved,
 }: {
   match: Match;
+  allMatches: Match[];
   prediction?: Prediction;
   onSaved: () => void;
 }) {
@@ -261,7 +270,13 @@ function MatchCard({
     const t = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(t);
   }, []);
-  const locked = !isAfter(lockAt, now) || match.status !== "scheduled";
+  const timeLocked = !isAfter(lockAt, now) || match.status !== "scheduled";
+  const unlockTrigger = useMemo(
+    () => getUnlockTrigger(match, allMatches),
+    [match, allMatches],
+  );
+  const roundOpen = !unlockTrigger || now.getTime() >= unlockTrigger.unlocksAt.getTime();
+  const locked = timeLocked || !roundOpen;
 
   const [a, setA] = useState<string>(prediction?.pred_a?.toString() ?? "");
   const [b, setB] = useState<string>(prediction?.pred_b?.toString() ?? "");
@@ -276,6 +291,7 @@ function MatchCard({
 
   async function handleSave() {
     if (!user) return;
+    if (!roundOpen) return toast.error("Esta ronda todavía no está disponible");
     const pa = parseInt(a, 10);
     const pb = parseInt(b, 10);
     if (isNaN(pa) || isNaN(pb) || pa < 0 || pb < 0) {
@@ -297,7 +313,8 @@ function MatchCard({
   const statusBadge = () => {
     if (match.status === "live") return <Badge className="bg-destructive text-destructive-foreground">EN VIVO</Badge>;
     if (match.status === "finished") return <Badge variant="secondary">Finalizado</Badge>;
-    if (locked) return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Cerrado</Badge>;
+    if (!roundOpen) return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Bloqueado</Badge>;
+    if (timeLocked) return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Cerrado</Badge>;
     return <Badge variant="outline">{format(new Date(match.kickoff_at), "HH:mm")}</Badge>;
   };
 
@@ -337,6 +354,20 @@ function MatchCard({
           </div>
           <TeamSide name={match.team_b} flag={match.team_b_flag} align="start" />
         </div>
+
+        {!roundOpen && unlockTrigger && (
+          <div className="rounded-md border border-dashed bg-muted/40 px-3 py-2 text-xs space-y-1">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Lock className="h-3.5 w-3.5" />
+              <span>
+                Se desbloquea cuando arranque <strong className="text-foreground">{unlockTrigger.prevRoundLabel}</strong>
+              </span>
+            </div>
+            <div className="flex justify-center">
+              <Countdown to={unlockTrigger.unlocksAt} />
+            </div>
+          </div>
+        )}
 
         {match.status === "finished" && (
           <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
