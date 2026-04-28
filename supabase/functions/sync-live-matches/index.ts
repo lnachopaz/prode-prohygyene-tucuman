@@ -1,5 +1,6 @@
 // Sincroniza partidos con Football-Data.org
 // Actualiza marcador/estado y sincroniza eventos (goles + tarjetas) en match_events.
+// Registra cada ejecución en sync_logs.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -30,13 +31,26 @@ function teamSide(eventTeamId: number, homeId: number): "home" | "away" {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const admin = createClient(supabaseUrl, serviceKey);
+
+  // Crear log row
+  const { data: logRow } = await admin
+    .from("sync_logs")
+    .insert({ function_name: "sync-live-matches", status: "running" })
+    .select("id")
+    .single();
+  const logId = logRow?.id;
+
+  async function finishLog(patch: Record<string, unknown>) {
+    if (!logId) return;
+    await admin.from("sync_logs").update({ ...patch, finished_at: new Date().toISOString() }).eq("id", logId);
+  }
+
   try {
     const apiKey = Deno.env.get("FOOTBALL_DATA_API_KEY");
     if (!apiKey) throw new Error("FOOTBALL_DATA_API_KEY not configured");
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const admin = createClient(supabaseUrl, serviceKey);
 
     const { data: matches, error } = await admin
       .from("matches")
@@ -45,6 +59,7 @@ Deno.serve(async (req) => {
 
     if (error) throw error;
     if (!matches || matches.length === 0) {
+      await finishLog({ status: "success", updated_count: 0, details: { message: "no linked matches" } });
       return new Response(
         JSON.stringify({ updated: 0, message: "No hay partidos vinculados a Football-Data." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -80,11 +95,9 @@ Deno.serve(async (req) => {
           .eq("id", m.id);
         if (upErr) throw upErr;
 
-        // ----- Eventos: goles + tarjetas -----
         const homeId: number | undefined = match.homeTeam?.id;
         const events: Array<Record<string, unknown>> = [];
 
-        // Goles
         const goals = Array.isArray(match.goals) ? match.goals : [];
         for (let i = 0; i < goals.length; i++) {
           const g = goals[i];
@@ -104,7 +117,6 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Tarjetas
         const bookings = Array.isArray(match.bookings) ? match.bookings : [];
         for (let i = 0; i < bookings.length; i++) {
           const b = bookings[i];
@@ -150,13 +162,24 @@ Deno.serve(async (req) => {
       }
     }
 
+    const okCount = results.filter((r) => r.ok).length;
+    const errCount = results.length - okCount;
+    await finishLog({
+      status: errCount === 0 ? "success" : okCount === 0 ? "error" : "partial",
+      updated_count: okCount,
+      details: { results },
+      error_message: errCount > 0 ? `${errCount} partidos fallaron` : null,
+    });
+
     return new Response(
-      JSON.stringify({ updated: results.filter((r) => r.ok).length, results }),
+      JSON.stringify({ updated: okCount, results }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.error("sync-live-matches error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {
+    await finishLog({ status: "error", error_message: msg });
+    return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
