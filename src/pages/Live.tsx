@@ -46,34 +46,31 @@ export default function Live() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Match en vivo: status=live, o si no hay, el próximo
-  const { data: liveMatch, isLoading } = useQuery({
+  const [selectedIdx, setSelectedIdx] = useState(0);
+
+  // Partidos en vivo (puede haber varios simultáneos) + fallback al próximo
+  const { data: liveData, isLoading } = useQuery({
     queryKey: ["live-match"],
     refetchInterval: 30_000,
     queryFn: async () => {
       const nowIso = new Date().toISOString();
 
-      // 1) Partido marcado como live por la sync
-      const { data: live } = await supabase
+      // 1) Todos los partidos marcados como live
+      const { data: lives } = await supabase
         .from("matches")
         .select("*")
         .eq("status", "live")
-        .order("kickoff_at")
-        .limit(1)
-        .maybeSingle();
-      if (live) return { match: live, isLive: true };
+        .order("kickoff_at");
+      if (lives && lives.length > 0) return { matches: lives, isLive: true };
 
-      // 2) Partido cuyo kickoff ya pasó pero aún no está marcado finished
-      //    (la sync puede tardar en cambiar el estado a 'live')
+      // 2) Partidos cuyo kickoff ya pasó pero aún no están finished
       const { data: ongoing } = await supabase
         .from("matches")
         .select("*")
         .lte("kickoff_at", nowIso)
         .neq("status", "finished")
-        .order("kickoff_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (ongoing) return { match: ongoing, isLive: true };
+        .order("kickoff_at", { ascending: false });
+      if (ongoing && ongoing.length > 0) return { matches: ongoing, isLive: true };
 
       // 3) Próximo partido programado
       const { data: next } = await supabase
@@ -83,9 +80,13 @@ export default function Live() {
         .order("kickoff_at")
         .limit(1)
         .maybeSingle();
-      return next ? { match: next, isLive: false } : null;
+      return next ? { matches: [next], isLive: false } : null;
     },
   });
+
+  const matches = liveData?.matches ?? [];
+  const safeIdx = Math.min(selectedIdx, Math.max(0, matches.length - 1));
+  const liveMatch = liveData ? { match: matches[safeIdx], isLive: liveData.isLive } : null;
 
   const matchId = liveMatch?.match?.id;
   const started = liveMatch ? (liveMatch.isLive || new Date(liveMatch.match.kickoff_at) <= new Date()) : false;
@@ -154,6 +155,24 @@ export default function Live() {
           <p className="text-muted-foreground">Seguí el partido en vivo y los pronósticos del grupo.</p>
         </div>
       </div>
+
+      {/* Selector cuando hay varios partidos en vivo */}
+      {matches.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {matches.map((mt, i) => (
+            <Button
+              key={mt.id}
+              variant={i === safeIdx ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedIdx(i)}
+              className="gap-2"
+            >
+              {liveData?.isLive && <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />}
+              <span className="tabular-nums">{mt.team_a} {mt.score_a ?? 0} - {mt.score_b ?? 0} {mt.team_b}</span>
+            </Button>
+          ))}
+        </div>
+      )}
 
       {/* Match card */}
       <Card className="border-primary/30 overflow-hidden">
