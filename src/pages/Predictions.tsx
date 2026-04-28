@@ -300,6 +300,7 @@ function MatchCard({
     if (match.status === "live") return <Badge className="bg-destructive text-destructive-foreground">EN VIVO</Badge>;
     if (match.status === "finished") return <Badge variant="secondary">Finalizado</Badge>;
     if (lockedByAdmin) return <Badge variant="destructive" className="gap-1"><Lock className="h-3 w-3" /> Bloqueado por admin</Badge>;
+    if (forcedOpen && timeLocked) return <Badge className="gap-1 bg-green-600 hover:bg-green-600">Reabierto por admin</Badge>;
     if (locked) return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Cerrado</Badge>;
     return <Badge variant="outline">{format(new Date(match.kickoff_at), "HH:mm")}</Badge>;
   };
