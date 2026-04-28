@@ -9,6 +9,8 @@ import { ArrowLeft, Loader2, Lock } from "lucide-react";
 import { format, isAfter, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
+import { getUnlockTrigger } from "@/lib/unlock";
+import { Countdown } from "@/components/Countdown";
 
 type Match = {
   id: string;
