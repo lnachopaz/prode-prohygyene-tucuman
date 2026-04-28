@@ -25,7 +25,23 @@ export default function Auth() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [adminCode, setAdminCode] = useState("");
+
+  // visibility toggles
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showSignupPasswordConfirm, setShowSignupPasswordConfirm] = useState(false);
+
+  // password rules (en tiempo real)
+  const passwordRules = [
+    { label: "Al menos 8 caracteres", test: (p: string) => p.length >= 8 },
+    { label: "Una letra mayúscula", test: (p: string) => /[A-Z]/.test(p) },
+    { label: "Una letra minúscula", test: (p: string) => /[a-z]/.test(p) },
+    { label: "Un número", test: (p: string) => /\d/.test(p) },
+  ];
+  const passwordValid = passwordRules.every((r) => r.test(password));
+  const passwordsMatch = password.length > 0 && password === passwordConfirm;
 
   // Detectar callback de confirmación de email (Supabase devuelve type=signup en hash o query)
   useEffect(() => {
