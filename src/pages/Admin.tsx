@@ -351,8 +351,8 @@ function UsersAdmin() {
             key={u.id}
             user={u}
             onRename={(n: string) => rename(u.id, n)}
-            onToggleAdmin={() => toggleAdmin(u.id, !u.is_admin)}
             onReject={() => setStatus(u.id, "rejected")}
+            onUnblock={() => setStatus(u.id, "approved")}
             onDelete={() => deleteUser(u.id, u.display_name)}
           />
         ))}
@@ -361,7 +361,7 @@ function UsersAdmin() {
   );
 }
 
-function UserRow({ user, onRename, onToggleAdmin, onReject, onDelete }: any) {
+function UserRow({ user, onRename, onReject, onUnblock, onDelete }: any) {
   const [name, setName] = useState(user.display_name);
   return (
     <Card>
