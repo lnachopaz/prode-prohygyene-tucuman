@@ -156,6 +156,24 @@ export default function Live() {
         </div>
       </div>
 
+      {/* Selector cuando hay varios partidos en vivo */}
+      {matches.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {matches.map((mt, i) => (
+            <Button
+              key={mt.id}
+              variant={i === safeIdx ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedIdx(i)}
+              className="gap-2"
+            >
+              {liveData?.isLive && <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />}
+              <span className="tabular-nums">{mt.team_a} {mt.score_a ?? 0} - {mt.score_b ?? 0} {mt.team_b}</span>
+            </Button>
+          ))}
+        </div>
+      )}
+
       {/* Match card */}
       <Card className="border-primary/30 overflow-hidden">
         <div className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider flex items-center gap-2 ${liveMatch.isLive ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground"}`}>
