@@ -1,67 +1,60 @@
-## Objetivo
+# Cargar fixture oficial del Mundial 2026 desde FIFA.com
 
-Que los pronósticos no estén disponibles desde el primer día. Los partidos se irán desbloqueando a medida que avance el torneo, evitando que alguien cargue ahora mismo todos los partidos hasta la final.
+## Problema actual
 
-## Regla de desbloqueo
+La tabla `matches` tiene partidos duplicados (ej. México-Sudáfrica aparece 2 veces) porque la edge function `sync-matches` se alimenta de **TheSportsDB**, que devuelve datos incompletos/inconsistentes y sin `external_id` estable, además de mezclar nombres de equipos en distintos idiomas.
 
-**Fase de grupos (por grupo, independiente cada uno):**
-- Jornada 1 de cada grupo: **abierta desde el inicio**.
-- Jornada 2 de un grupo: se desbloquea cuando **arranca el primer partido de la Jornada 1 de ese mismo grupo**.
-- Jornada 3 de un grupo: se desbloquea cuando **arranca el primer partido de la Jornada 2 de ese mismo grupo**.
+## Solución
 
-**Eliminatorias (mano a mano, todas juntas por ronda):**
-- Dieciseisavos: bloqueado hasta que **arranque el primer partido de la Jornada 3 de fase de grupos**.
-- Octavos: se desbloquea cuando **arranque el primer partido de Dieciseisavos**.
-- Cuartos: se desbloquea cuando **arranque el primer partido de Octavos**.
-- Semifinales: se desbloquea cuando **arranque el primer partido de Cuartos**.
-- Tercer puesto y Final: se desbloquean cuando **arranque la primera Semifinal**.
+Reemplazar la fuente de datos por el **fixture oficial de FIFA.com** que ya verifiqué (página `scores-fixtures` del Mundial 2026). Los datos son completos: 48 equipos, 12 grupos (A–L), 72 partidos de fase de grupos + eliminatorias, con sede, fecha y hora local del estadio.
 
-Además del bloqueo por ronda, sigue vigente el cierre individual de cada partido **1 hora antes del kickoff** (ya existente).
+## Pasos
 
-## Visualización
+### 1. Generar el dataset definitivo (script local, una sola vez)
 
-Los partidos bloqueados por ronda **se siguen mostrando** en la lista, pero:
-- Inputs deshabilitados.
-- Badge tipo "Bloqueado · se abre cuando arranque [ronda anterior]".
-- Countdown hasta el kickoff del primer partido de la ronda anterior (que es lo que dispara el desbloqueo).
-- Botón "Guardar pronóstico" oculto (igual que con el cierre actual).
-- En `MatchDetails`, mismo tratamiento: si la ronda está bloqueada, no se permite cargar.
+- Parsear el markdown de la página de FIFA que ya tengo descargado (1753 líneas, contiene los 104 partidos del torneo).
+- Extraer por cada partido: `team_a`, `team_b`, `group_name`, `stage` ("Primera fase", "Octavos", "Cuartos", "Semifinales", "Final"), estadio, fecha local y hora local.
+- Mapear cada **estadio → zona horaria** para convertir la hora local correctamente a UTC en `kickoff_at`. Mapa de sedes:
+  ```
+  Ciudad de México, Guadalajara, Monterrey  → America/Mexico_City
+  Toronto                                   → America/Toronto
+  Vancouver                                 → America/Vancouver
+  Atlanta, Boston, Filadelfia, NY/NJ, Miami → America/New_York
+  Dallas, Houston, Kansas City, Monterrey   → America/Chicago (Dallas/Houston/KC) / Monterrey ya MX
+  Seattle, Los Ángeles, Bahía de SF         → America/Los_Angeles
+  ```
+- Asignar `external_id = "fifa-<idMatch>"` (el ID que aparece en cada URL `/match/17/285023/289273/<idMatch>`) para evitar duplicados futuros.
+- Generar un único archivo TS en el repo con todas las filas tipadas.
+
+### 2. Limpiar y recargar la base de datos
+
+- Migración SQL: `DELETE FROM matches;` (esto también elimina pronósticos huérfanos vía cascada lógica — confirmar si conservar pronósticos de usuarios ya cargados; ver "Cuestión abierta" abajo).
+- Insertar las ~104 filas del fixture oficial usando la herramienta de inserción.
+- Mantener el campo `team_a_flag`/`team_b_flag` en `null` — el frontend ya resuelve la bandera con `getCountryFlagUrl()` por nombre del país (lib `countryFlags.ts`). Asegurar que **todos** los nombres usados (ej. "RI de Irán", "Islas de Cabo Verde", "RD Congo", "República de Corea", "EE. UU.", "Bosnia y Herzegovina", "Curazao") estén en el diccionario.
+
+### 3. Deshabilitar el sync automático con TheSportsDB
+
+- Quitar el botón "Sincronizar fixture" del panel admin (o renombrarlo a "Recargar fixture oficial" apuntando a una nueva edge function que reinserte el dataset estático).
+- Marcar la edge function `sync-matches` como obsoleta o reemplazar su contenido por un seed del dataset estático (más confiable que scraping en runtime, ya que FIFA no expone API pública).
+
+### 4. Frontend
+
+- No requiere cambios en `Predictions.tsx`.
+- Ampliar `src/lib/countryFlags.ts` con cualquier nombre faltante detectado en el parseo.
 
 ## Detalles técnicos
 
-**1. Helper de "rondas" y desbloqueo (frontend, sin cambios de schema)**
+- **Archivo nuevo**: `src/data/worldCup2026Fixture.ts` — array tipado con los partidos (single source of truth).
+- **Edge function reescrita**: `supabase/functions/sync-matches/index.ts` → en vez de fetchear TheSportsDB, hace `upsert` del dataset estático con `onConflict: "external_id"`. Idempotente y rápido.
+- **Migración**: limpieza de `matches` + inserción inicial (o dejar que el admin pulse "Recargar fixture" tras desplegar).
+- **Zonas horarias**: usar `date-fns-tz` (ya disponible vía `date-fns`) o cálculo manual por offset fijo de junio/julio 2026 (todas las sedes están en horario de verano en esas fechas, offsets estables).
 
-Crear `src/lib/unlock.ts` con:
-- `getRoundKey(match)`: devuelve la "ronda" lógica del partido.
-  - Fase de grupos: `"group:<group_name>:J<n>"` (ej: `"group:Grupo A:J2"`).
-  - Knockout: `"ko:<stage>"` (ej: `"ko:Dieciseisavos de final"`, `"ko:Octavos de final"`, etc.).
-- `getUnlockTrigger(match, allMatches)`: devuelve el `Date` (kickoff del primer partido de la ronda anterior) que desbloquea esta ronda. `null` si la ronda no tiene precondición (J1 de grupos).
-- `isRoundUnlocked(match, allMatches, now)`: `true` si la ronda ya está desbloqueada.
+## Cuestión abierta
 
-Orden de rondas KO inferido del `stage` por palabras clave: `Dieciseisavos` → `Octavos` → `Cuartos` → `Semifinal` → `Tercer puesto`/`Final`. Tercer puesto y Final comparten trigger (primera semifinal). Si el fixture no contiene una ronda intermedia (ej: no hay Dieciseisavos), el helper salta a la ronda anterior existente.
+Si algún usuario ya cargó pronósticos sobre los partidos duplicados/erróneos actuales, al borrar `matches` se perderán esos pronósticos. Como el torneo aún no empezó y los datos actuales están mal, lo razonable es **borrar todo y empezar limpio**, pero confirmá si preferís preservar pronósticos intentando hacer match por nombres de equipos antes de borrar.
 
-**2. `src/pages/Predictions.tsx`**
-- En `MatchCard`, calcular `roundUnlocked` con el helper.
-- `locked = roundLocked || timeWindowLocked || match.status !== "scheduled"`.
-- Si `roundLocked && !timeWindowLocked`, mostrar badge "Bloqueado" + texto "Se desbloquea cuando arranque [nombre de ronda anterior]" + reusar `<Countdown to={trigger} />`.
-- Pasar `allMatches` al `MatchCard` (ya disponible via `matches` en el componente padre).
-- Filtro "Estado" del select: agregar opción "Bloqueados por ronda" para listarlos por separado si querés (opcional, decidible en build).
+## Resultado esperado
 
-**3. `src/pages/MatchDetails.tsx`**
-- Misma lógica: cargar todos los matches (query liviana de `id, stage, group_name, kickoff_at, status`) para evaluar `isRoundUnlocked`.
-- Si la ronda está bloqueada, mostrar mensaje en lugar del bloque "Pronósticos de los demás" y, si existiera UI de carga aquí, ocultarla.
-
-**4. RLS / backend**
-- **No se modifica.** Las políticas actuales ya impiden cargar pronósticos a menos de 1h del kickoff, y un usuario malicioso técnicamente podría intentar `INSERT` directo, pero la validación de "ronda anterior arrancada" se aplica en el cliente. Si querés enforcement server-side, decirlo y agrego una RLS extra que valide contra `matches` de la ronda anterior (más complejo, requiere función `is_round_unlocked(match_id)` en SQL).
-
-## Archivos afectados
-
-- **Crear**: `src/lib/unlock.ts`
-- **Editar**: `src/pages/Predictions.tsx` (uso del helper en `MatchCard`, badge + countdown)
-- **Editar**: `src/pages/MatchDetails.tsx` (bloqueo de la vista cuando la ronda no está abierta)
-
-## Fuera de alcance
-
-- No se cambia la regla de cierre 1h antes del kickoff.
-- No se cambian rankings ni cálculo de puntos.
-- No se enforza la regla en RLS (consultar si lo querés agregar).
+- 104 partidos correctos, sin duplicados, con horarios UTC precisos.
+- Banderas de país estándar ya funcionando vía el helper existente.
+- Fixture deja de depender de una API externa inestable.

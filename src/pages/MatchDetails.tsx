@@ -9,8 +9,6 @@ import { ArrowLeft, Loader2, Lock } from "lucide-react";
 import { format, isAfter, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
-import { getUnlockTrigger } from "@/lib/unlock";
-import { Countdown } from "@/components/Countdown";
 
 type Match = {
   id: string;
@@ -52,24 +50,6 @@ export default function MatchDetails() {
       return data as Match | null;
     },
   });
-
-  const { data: allMatches } = useQuery({
-    queryKey: ["matches-min"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("matches")
-        .select("id, stage, group_name, kickoff_at");
-      if (error) throw error;
-      return data as { id: string; stage: string; group_name: string | null; kickoff_at: string }[];
-    },
-  });
-
-  const unlockTrigger = useMemo(() => {
-    if (!match || !allMatches) return null;
-    return getUnlockTrigger(match, allMatches);
-  }, [match, allMatches]);
-
-  const roundOpen = !unlockTrigger || Date.now() >= unlockTrigger.unlocksAt.getTime();
 
   const locked = useMemo(() => {
     if (!match) return false;
@@ -186,23 +166,6 @@ export default function MatchDetails() {
           </div>
         </CardContent>
       </Card>
-
-      {!roundOpen && unlockTrigger && (
-        <Card className="border-dashed">
-          <CardContent className="p-4 space-y-2 text-center">
-            <div className="flex items-center justify-center gap-2 text-sm">
-              <Lock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">
-                Esta ronda todavía no está disponible. Se desbloquea cuando arranque{" "}
-                <strong className="text-foreground">{unlockTrigger.prevRoundLabel}</strong>.
-              </span>
-            </div>
-            <div className="flex justify-center">
-              <Countdown to={unlockTrigger.unlocksAt} />
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <div>
         <h2 className="text-xl font-bold mb-3">Pronósticos de los jugadores</h2>
