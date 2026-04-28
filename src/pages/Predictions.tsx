@@ -189,7 +189,8 @@ export default function Predictions() {
             <SelectItem value="loaded">Pronóstico cargado</SelectItem>
             <SelectItem value="missing">Sin pronóstico</SelectItem>
             <SelectItem value="open">Abiertos</SelectItem>
-            <SelectItem value="locked">Cerrados</SelectItem>
+            <SelectItem value="locked">Cerrados (1h antes)</SelectItem>
+            <SelectItem value="round_locked">Bloqueados por ronda</SelectItem>
             <SelectItem value="finished">Finalizados</SelectItem>
           </SelectContent>
         </Select>
