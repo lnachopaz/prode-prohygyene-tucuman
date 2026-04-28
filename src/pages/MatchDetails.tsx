@@ -53,6 +53,24 @@ export default function MatchDetails() {
     },
   });
 
+  const { data: allMatches } = useQuery({
+    queryKey: ["matches-min"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("matches")
+        .select("id, stage, group_name, kickoff_at");
+      if (error) throw error;
+      return data as { id: string; stage: string; group_name: string | null; kickoff_at: string }[];
+    },
+  });
+
+  const unlockTrigger = useMemo(() => {
+    if (!match || !allMatches) return null;
+    return getUnlockTrigger(match, allMatches);
+  }, [match, allMatches]);
+
+  const roundOpen = !unlockTrigger || Date.now() >= unlockTrigger.unlocksAt.getTime();
+
   const locked = useMemo(() => {
     if (!match) return false;
     const lockAt = subHours(new Date(match.kickoff_at), 1);
