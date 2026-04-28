@@ -13,12 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save, Lock, X, Eye } from "lucide-react";
+import { Loader2, Save, Lock, X } from "lucide-react";
 import { toast } from "sonner";
 import { format, isAfter, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
-import { Link } from "react-router-dom";
 
 type Match = {
   id: string;
@@ -354,19 +353,12 @@ function MatchCard({
           </div>
         )}
 
-        <div className="flex items-center gap-2">
-          <Button asChild size="sm" variant="outline" className="flex-1">
-            <Link to={`/match/${match.id}`}>
-              <Eye className="h-4 w-4 mr-2" /> Ver detalles
-            </Link>
+        {!locked && (
+          <Button size="sm" className="w-full" onClick={handleSave} disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Guardar pronóstico
           </Button>
-          {!locked && (
-            <Button size="sm" className="flex-1" onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              Guardar pronóstico
-            </Button>
-          )}
-        </div>
+        )}
       </CardContent>
     </Card>
   );
