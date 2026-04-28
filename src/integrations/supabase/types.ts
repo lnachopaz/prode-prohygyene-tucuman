@@ -98,6 +98,7 @@ export type Database = {
           team_a_flag: string | null
           team_b: string
           team_b_flag: string | null
+          test_mode: boolean
           updated_at: string
           venue: string | null
           venue_tz: string | null
@@ -117,6 +118,7 @@ export type Database = {
           team_a_flag?: string | null
           team_b: string
           team_b_flag?: string | null
+          test_mode?: boolean
           updated_at?: string
           venue?: string | null
           venue_tz?: string | null
@@ -136,6 +138,7 @@ export type Database = {
           team_a_flag?: string | null
           team_b?: string
           team_b_flag?: string | null
+          test_mode?: boolean
           updated_at?: string
           venue?: string | null
           venue_tz?: string | null
