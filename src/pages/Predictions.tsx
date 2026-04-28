@@ -119,8 +119,15 @@ export default function Predictions() {
 
   const grouped = useMemo(() => {
     const byDate = new Map<string, Match[]>();
+    // Agrupamos por fecha en horario Argentina para evitar desfasajes según la zona del navegador
+    const fmtKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Argentina/Buenos_Aires",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
     filtered.forEach((m) => {
-      const key = format(new Date(m.kickoff_at), "yyyy-MM-dd");
+      const key = fmtKey.format(new Date(m.kickoff_at)); // YYYY-MM-DD en AR
       const arr = byDate.get(key) ?? [];
       arr.push(m);
       byDate.set(key, arr);
@@ -217,7 +224,10 @@ export default function Predictions() {
         grouped.map(([date, dayMatches]) => (
           <section key={date} className="space-y-3">
             <h2 className="text-lg font-semibold capitalize text-muted-foreground">
-              {format(new Date(date), "EEEE d 'de' MMMM yyyy", { locale: es })}
+              {(() => {
+                const [y, mo, d] = date.split("-").map(Number);
+                return format(new Date(y, mo - 1, d, 12), "EEEE d 'de' MMMM yyyy", { locale: es });
+              })()}
             </h2>
             <div className="grid gap-3 md:grid-cols-2">
               {dayMatches.map((m) => {
