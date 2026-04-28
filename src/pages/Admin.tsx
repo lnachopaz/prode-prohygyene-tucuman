@@ -772,7 +772,12 @@ function TestModeAdmin() {
               <Card key={m.id}>
                 <CardContent className="p-3 flex flex-wrap items-center gap-2">
                   <div className="flex-1 min-w-[200px]">
-                    <div className="font-semibold">{m.team_a} vs {m.team_b}</div>
+                    <div className="font-semibold flex items-center gap-2">
+                      {m.team_a} vs {m.team_b}
+                      {m.test_mode && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 font-medium">🧪 PRUEBA</span>
+                      )}
+                    </div>
                     <div className="text-2xl font-mono mt-1">{m.score_a ?? 0} - {m.score_b ?? 0}</div>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => addGoal(m.id, "a", m)}>
@@ -784,6 +789,15 @@ function TestModeAdmin() {
                   <Button size="sm" onClick={() => finish(m.id)}>
                     <Square className="h-4 w-4 mr-1" />Finalizar
                   </Button>
+                  {m.test_mode ? (
+                    <Button size="sm" variant="outline" onClick={() => disableTestMode(m.id)} title="Desactivar modo prueba (vuelve al sync automático)">
+                      ✅ Salir prueba
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => enableTestMode(m.id)} title="Activar modo prueba (el sync no lo tocará)">
+                      🧪 Activar prueba
+                    </Button>
+                  )}
                   <Button size="sm" variant="ghost" onClick={() => reset(m.id)}>
                     <RotateCcw className="h-4 w-4" />
                   </Button>
@@ -803,8 +817,22 @@ function TestModeAdmin() {
               <CardContent className="p-3 flex flex-wrap items-center gap-2">
                 <div className="flex-1 min-w-[200px]">
                   <div className="text-xs text-muted-foreground">{format(new Date(m.kickoff_at), "dd/MM HH:mm")}</div>
-                  <div className="font-medium">{m.team_a} vs {m.team_b}</div>
+                  <div className="font-medium flex items-center gap-2">
+                    {m.team_a} vs {m.team_b}
+                    {m.test_mode && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 font-medium">🧪 PRUEBA</span>
+                    )}
+                  </div>
                 </div>
+                {m.test_mode ? (
+                  <Button size="sm" variant="outline" onClick={() => disableTestMode(m.id)}>
+                    ✅ Salir prueba
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => enableTestMode(m.id)}>
+                    🧪 Activar prueba
+                  </Button>
+                )}
                 <Button size="sm" onClick={() => setLive(m.id)}>
                   <Play className="h-4 w-4 mr-1" />Marcar en vivo
                 </Button>
