@@ -251,6 +251,7 @@ function MatchCard({
   onSaved: () => void;
 }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const lockAt = subHours(new Date(match.kickoff_at), 1);
   const [now, setNow] = useState(new Date());
   useEffect(() => {
