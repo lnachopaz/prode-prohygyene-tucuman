@@ -193,7 +193,71 @@ export default function Auth() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signupPassword">Contraseña</Label>
-                    <Input id="signupPassword" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <div className="relative">
+                      <Input
+                        id="signupPassword"
+                        type={showSignupPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSignupPassword((v) => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showSignupPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        tabIndex={-1}
+                      >
+                        {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <ul className="space-y-1 rounded-md border bg-muted/30 p-2 text-xs">
+                      {passwordRules.map((rule) => {
+                        const ok = rule.test(password);
+                        return (
+                          <li
+                            key={rule.label}
+                            className={`flex items-center gap-2 ${ok ? "text-success" : "text-muted-foreground"}`}
+                          >
+                            {ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                            <span>{rule.label}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signupPasswordConfirm">Repetir contraseña</Label>
+                    <div className="relative">
+                      <Input
+                        id="signupPasswordConfirm"
+                        type={showSignupPasswordConfirm ? "text" : "password"}
+                        required
+                        value={passwordConfirm}
+                        onChange={(e) => setPasswordConfirm(e.target.value)}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSignupPasswordConfirm((v) => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showSignupPasswordConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        tabIndex={-1}
+                      >
+                        {showSignupPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {passwordConfirm.length > 0 && (
+                      <p
+                        className={`flex items-center gap-2 text-xs ${
+                          passwordsMatch ? "text-success" : "text-destructive"
+                        }`}
+                      >
+                        {passwordsMatch ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                        {passwordsMatch ? "Las contraseñas coinciden" : "Las contraseñas no coinciden"}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="adminCode">Código de admin (opcional)</Label>
