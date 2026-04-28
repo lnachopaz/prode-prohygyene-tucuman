@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -13,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save, Lock, X } from "lucide-react";
+import { Loader2, Save, Lock, X, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { format, isAfter, subHours } from "date-fns";
 import { es } from "date-fns/locale";
@@ -250,6 +251,7 @@ function MatchCard({
   onSaved: () => void;
 }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const lockAt = subHours(new Date(match.kickoff_at), 1);
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -353,12 +355,21 @@ function MatchCard({
           </div>
         )}
 
-        {!locked && (
-          <Button size="sm" className="w-full" onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Guardar pronóstico
+        <div className="flex items-center gap-2 pt-1">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => navigate(`/match/${match.id}`)}
+          >
+            <Eye className="h-4 w-4 mr-2" /> Ver detalles
           </Button>
-        )}
+          {!locked && (
+            <Button size="sm" className="ml-auto" onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Guardar pronóstico
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
