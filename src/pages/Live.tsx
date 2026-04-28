@@ -51,6 +51,9 @@ export default function Live() {
     queryKey: ["live-match"],
     refetchInterval: 30_000,
     queryFn: async () => {
+      const nowIso = new Date().toISOString();
+
+      // 1) Partido marcado como live por la sync
       const { data: live } = await supabase
         .from("matches")
         .select("*")
@@ -60,10 +63,23 @@ export default function Live() {
         .maybeSingle();
       if (live) return { match: live, isLive: true };
 
+      // 2) Partido cuyo kickoff ya pasó pero aún no está marcado finished
+      //    (la sync puede tardar en cambiar el estado a 'live')
+      const { data: ongoing } = await supabase
+        .from("matches")
+        .select("*")
+        .lte("kickoff_at", nowIso)
+        .neq("status", "finished")
+        .order("kickoff_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (ongoing) return { match: ongoing, isLive: true };
+
+      // 3) Próximo partido programado
       const { data: next } = await supabase
         .from("matches")
         .select("*")
-        .gt("kickoff_at", new Date().toISOString())
+        .gt("kickoff_at", nowIso)
         .order("kickoff_at")
         .limit(1)
         .maybeSingle();
