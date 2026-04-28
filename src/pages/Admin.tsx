@@ -336,7 +336,8 @@ function UsersAdmin() {
                   <Badge variant="outline" className="gap-1">Email sin verificar</Badge>
                 )}
                 <Button size="sm" onClick={() => setStatus(u.id, "approved")}>Aprobar</Button>
-                <Button size="sm" variant="destructive" onClick={() => setStatus(u.id, "rejected")}>Rechazar</Button>
+                <Button size="sm" variant="outline" onClick={() => setStatus(u.id, "rejected")}>Rechazar</Button>
+                <Button size="sm" variant="destructive" onClick={() => deleteUser(u.id, u.display_name)}>Eliminar</Button>
               </CardContent>
             </Card>
           ))
