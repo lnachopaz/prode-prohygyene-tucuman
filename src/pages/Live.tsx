@@ -186,6 +186,29 @@ export default function Live() {
               <Countdown to={m.kickoff_at} />
             </div>
           )}
+
+          {started && (
+            <div className="mt-6 rounded-md border bg-muted/40 p-3 text-sm">
+              {myPred ? (() => {
+                const partial = calcPoints(myPred.pred_a, myPred.pred_b, m.score_a, m.score_b);
+                return (
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-muted-foreground">
+                      Tu pronóstico: <strong className="text-foreground tabular-nums">{myPred.pred_a} - {myPred.pred_b}</strong>
+                    </span>
+                    <span>
+                      <span className="text-muted-foreground mr-2">{m.status === "finished" ? "Final:" : "Parcial:"}</span>
+                      {partial === 3 ? <Badge className="bg-success text-success-foreground">+3 pts</Badge>
+                        : partial === 1 ? <Badge variant="secondary">+1 pt</Badge>
+                        : <Badge variant="outline">0 pts</Badge>}
+                    </span>
+                  </div>
+                );
+              })() : (
+                <p className="text-muted-foreground text-center">No pronosticaste este partido.</p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
