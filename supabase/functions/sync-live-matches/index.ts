@@ -36,20 +36,12 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey);
 
     // Buscar partidos con external_id estilo "fd-<id>"
-    // Reintenta ante errores transitorios de PostgREST (PGRST000/PGRST002)
-    let matches: Array<{ id: string; external_id: string | null; status: string }> | null = null;
-    let lastErr: any = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const { data, error } = await admin
-        .from("matches")
-        .select("id, external_id, status")
-        .like("external_id", "fd-%");
-      if (!error) { matches = data; lastErr = null; break; }
-      lastErr = error;
-      if (error.code !== "PGRST000" && error.code !== "PGRST002") break;
-      await new Promise((res) => setTimeout(res, 1000 * (attempt + 1)));
-    }
-    if (lastErr) throw lastErr;
+    const { data: matches, error } = await admin
+      .from("matches")
+      .select("id, external_id, status")
+      .like("external_id", "fd-%");
+
+    if (error) throw error;
     if (!matches || matches.length === 0) {
       return new Response(JSON.stringify({ updated: 0, message: "No hay partidos vinculados a Football-Data." }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -94,10 +86,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ updated: results.filter((r) => r.ok).length, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (e: any) {
-    const msg = e?.message || e?.error_description || (typeof e === "string" ? e : JSON.stringify(e));
-    console.error("sync-live-matches error:", msg, e);
-    return new Response(JSON.stringify({ error: msg, code: e?.code }), {
+  } catch (e) {
+    console.error("sync-live-matches error:", e);
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

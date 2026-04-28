@@ -24,12 +24,10 @@ export default function Admin() {
         <TabsList>
           <TabsTrigger value="matches">Partidos</TabsTrigger>
           <TabsTrigger value="users">Usuarios</TabsTrigger>
-          <TabsTrigger value="predictions">Pronósticos</TabsTrigger>
           <TabsTrigger value="codes">Códigos admin</TabsTrigger>
         </TabsList>
         <TabsContent value="matches" className="mt-4"><MatchesAdmin /></TabsContent>
         <TabsContent value="users" className="mt-4"><UsersAdmin /></TabsContent>
-        <TabsContent value="predictions" className="mt-4"><PredictionsAdmin /></TabsContent>
         <TabsContent value="codes" className="mt-4"><CodesAdmin /></TabsContent>
       </Tabs>
     </div>
@@ -201,25 +199,12 @@ function UsersAdmin() {
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      const [{ data: profiles, error }, { data: roles }, { data: lb }, emailsRes] = await Promise.all([
-        supabase.from("profiles").select("*").order("display_name"),
-        supabase.from("user_roles").select("*"),
-        supabase.from("leaderboard").select("user_id, total_points, predictions_count").order("total_points", { ascending: false }),
-        supabase.functions.invoke("admin-users", { body: { action: "list_users" } }),
-      ]);
+      const { data: profiles, error } = await supabase.from("profiles").select("*").order("display_name");
       if (error) throw error;
-      const emails: Record<string, string> = (emailsRes.data as any)?.emails ?? {};
-      const rankMap = new Map<string, { rank: number; points: number; count: number }>();
-      (lb ?? []).forEach((row: any, i: number) => {
-        rankMap.set(row.user_id, { rank: i + 1, points: row.total_points, count: row.predictions_count });
-      });
+      const { data: roles } = await supabase.from("user_roles").select("*");
       return profiles.map((p) => ({
         ...p,
-        email: emails[p.id] ?? "",
         is_admin: roles?.some((r) => r.user_id === p.id && r.role === "admin") ?? false,
-        rank: rankMap.get(p.id)?.rank ?? null,
-        points: rankMap.get(p.id)?.points ?? 0,
-        predictions_count: rankMap.get(p.id)?.count ?? 0,
       }));
     },
   });
@@ -244,27 +229,10 @@ function UsersAdmin() {
   }
 
   async function setStatus(userId: string, status: "approved" | "rejected" | "pending") {
-    const { data, error } = await supabase.functions.invoke("admin-users", {
-      body: { action: "update_status", user_id: userId, status },
-    });
-    if (error || (data as any)?.error) {
-      return toast.error((data as any)?.error ?? error?.message ?? "No se pudo actualizar el estado");
-    }
+    const { error } = await supabase.from("profiles").update({ status }).eq("id", userId);
+    if (error) return toast.error(error.message);
     toast.success(status === "approved" ? "Usuario aprobado" : status === "rejected" ? "Usuario rechazado" : "Marcado como pendiente");
     qc.invalidateQueries({ queryKey: ["admin-users"] });
-  }
-
-  async function deleteUser(userId: string, name: string) {
-    if (!confirm(`¿Eliminar definitivamente a ${name}? Esta acción no se puede deshacer y borrará sus pronósticos.`)) return;
-    const { data, error } = await supabase.functions.invoke("admin-users", {
-      body: { action: "delete_user", user_id: userId },
-    });
-    if (error || (data as any)?.error) {
-      return toast.error((data as any)?.error ?? error?.message ?? "Error eliminando");
-    }
-    toast.success("Usuario eliminado");
-    qc.invalidateQueries({ queryKey: ["admin-users"] });
-    qc.invalidateQueries({ queryKey: ["leaderboard"] });
   }
 
   if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-primary" />;
@@ -287,14 +255,10 @@ function UsersAdmin() {
               <CardContent className="p-3 flex flex-wrap items-center gap-2">
                 <div className="flex-1 min-w-[180px]">
                   <p className="font-medium">{u.display_name}</p>
-                  {u.email && <p className="text-xs text-muted-foreground">{u.email}</p>}
                   <p className="text-xs text-muted-foreground">Solicitado: {format(new Date(u.created_at), "dd/MM/yyyy HH:mm")}</p>
                 </div>
                 <Button size="sm" onClick={() => setStatus(u.id, "approved")}>Aprobar</Button>
                 <Button size="sm" variant="destructive" onClick={() => setStatus(u.id, "rejected")}>Rechazar</Button>
-                <Button size="sm" variant="ghost" onClick={() => deleteUser(u.id, u.display_name)}>
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
               </CardContent>
             </Card>
           ))
@@ -310,7 +274,6 @@ function UsersAdmin() {
             onRename={(n: string) => rename(u.id, n)}
             onToggleAdmin={() => toggleAdmin(u.id, !u.is_admin)}
             onReject={() => setStatus(u.id, "rejected")}
-            onDelete={() => deleteUser(u.id, u.display_name)}
           />
         ))}
       </div>
@@ -318,32 +281,21 @@ function UsersAdmin() {
   );
 }
 
-function UserRow({ user, onRename, onToggleAdmin, onReject, onDelete }: any) {
+function UserRow({ user, onRename, onToggleAdmin, onReject }: any) {
   const [name, setName] = useState(user.display_name);
   return (
     <Card>
-      <CardContent className="p-3 space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Input className="flex-1 min-w-[180px]" value={name} onChange={(e) => setName(e.target.value)} />
-          <Button size="sm" variant="outline" onClick={() => onRename(name)}>Guardar</Button>
-          {user.is_admin && <Badge>Admin</Badge>}
-          {user.status === "rejected" && <Badge variant="destructive">Rechazado</Badge>}
-          <Button size="sm" variant={user.is_admin ? "destructive" : "default"} onClick={onToggleAdmin}>
-            {user.is_admin ? "Quitar admin" : "Hacer admin"}
-          </Button>
-          {user.status === "approved" && !user.is_admin && (
-            <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
-          )}
-          <Button size="sm" variant="ghost" onClick={onDelete}>
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          {user.email && <span>📧 {user.email}</span>}
-          <span>🏆 {user.rank ? `#${user.rank}` : "—"}</span>
-          <span>⭐ {user.points} pts</span>
-          <span>📝 {user.predictions_count} pronósticos</span>
-        </div>
+      <CardContent className="p-3 flex flex-wrap items-center gap-2">
+        <Input className="flex-1 min-w-[180px]" value={name} onChange={(e) => setName(e.target.value)} />
+        <Button size="sm" variant="outline" onClick={() => onRename(name)}>Guardar</Button>
+        {user.is_admin && <Badge>Admin</Badge>}
+        {user.status === "rejected" && <Badge variant="destructive">Rechazado</Badge>}
+        <Button size="sm" variant={user.is_admin ? "destructive" : "default"} onClick={onToggleAdmin}>
+          {user.is_admin ? "Quitar admin" : "Hacer admin"}
+        </Button>
+        {user.status === "approved" && !user.is_admin && (
+          <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
+        )}
       </CardContent>
     </Card>
   );
@@ -407,135 +359,6 @@ function CodesAdmin() {
           </Card>
         ))}
       </div>
-    </div>
-  );
-}
-
-function PredictionsAdmin() {
-  const [matchFilter, setMatchFilter] = useState<string>("all");
-  const [userFilter, setUserFilter] = useState<string>("all");
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-all-predictions"],
-    queryFn: async () => {
-      const [predsRes, matchesRes, profilesRes] = await Promise.all([
-        supabase.from("predictions").select("*").order("created_at", { ascending: false }),
-        supabase.from("matches").select("id, team_a, team_b, kickoff_at, score_a, score_b, status, stage").order("kickoff_at"),
-        supabase.from("profiles").select("id, display_name, status"),
-      ]);
-      if (predsRes.error) throw predsRes.error;
-      if (matchesRes.error) throw matchesRes.error;
-      if (profilesRes.error) throw profilesRes.error;
-      const matchMap = new Map((matchesRes.data ?? []).map((m: any) => [m.id, m]));
-      const profileMap = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p]));
-      return {
-        preds: predsRes.data ?? [],
-        matches: matchesRes.data ?? [],
-        profiles: profilesRes.data ?? [],
-        matchMap,
-        profileMap,
-      };
-    },
-  });
-
-  if (isLoading || !data) return <Loader2 className="h-6 w-6 animate-spin text-primary" />;
-
-  const filtered = data.preds.filter((p: any) => {
-    if (matchFilter !== "all" && p.match_id !== matchFilter) return false;
-    if (userFilter !== "all" && p.user_id !== userFilter) return false;
-    return true;
-  });
-
-  // Group by match
-  const grouped = new Map<string, any[]>();
-  filtered.forEach((p: any) => {
-    const arr = grouped.get(p.match_id) ?? [];
-    arr.push(p);
-    grouped.set(p.match_id, arr);
-  });
-
-  const groupedArr = Array.from(grouped.entries())
-    .map(([matchId, preds]) => ({ match: data.matchMap.get(matchId) as any, preds }))
-    .filter((g) => g.match)
-    .sort((a, b) => new Date(a.match.kickoff_at).getTime() - new Date(b.match.kickoff_at).getTime());
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <div className="min-w-[200px]">
-          <Label className="text-xs">Filtrar por partido</Label>
-          <Select value={matchFilter} onValueChange={setMatchFilter}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los partidos</SelectItem>
-              {data.matches.map((m: any) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {format(new Date(m.kickoff_at), "dd/MM")} · {m.team_a} vs {m.team_b}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="min-w-[200px]">
-          <Label className="text-xs">Filtrar por usuario</Label>
-          <Select value={userFilter} onValueChange={setUserFilter}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los usuarios</SelectItem>
-              {data.profiles.map((p: any) => (
-                <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {groupedArr.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No hay pronósticos para mostrar.</p>
-      ) : (
-        groupedArr.map(({ match, preds }) => (
-          <Card key={match.id}>
-            <CardHeader className="pb-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <CardTitle className="text-base">{match.team_a} vs {match.team_b}</CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    {format(new Date(match.kickoff_at), "dd/MM/yyyy HH:mm")} · {match.stage}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Resultado</p>
-                  <p className="font-bold">
-                    {match.score_a ?? "-"} - {match.score_b ?? "-"}
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-1">
-                {preds.map((p: any) => {
-                  const prof = data.profileMap.get(p.user_id) as any;
-                  return (
-                    <div key={p.id} className="flex items-center justify-between text-sm border-t border-border py-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{prof?.display_name ?? "Usuario"}</span>
-                        {prof?.status === "rejected" && <Badge variant="destructive" className="text-[10px]">Rechazado</Badge>}
-                        {prof?.status === "pending" && <Badge variant="secondary" className="text-[10px]">Pendiente</Badge>}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono">{p.pred_a} - {p.pred_b}</span>
-                        <Badge variant={p.points === 3 ? "default" : p.points === 1 ? "secondary" : "outline"} className="min-w-[50px] justify-center">
-                          {p.points} pt{p.points === 1 ? "" : "s"}
-                        </Badge>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        ))
-      )}
     </div>
   );
 }

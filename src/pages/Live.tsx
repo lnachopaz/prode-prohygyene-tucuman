@@ -87,6 +87,19 @@ export default function Live() {
     },
   });
 
+  // Próximos partidos siguientes
+  const { data: upcoming } = useQuery({
+    queryKey: ["live-upcoming"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("matches")
+        .select("*")
+        .gt("kickoff_at", new Date().toISOString())
+        .order("kickoff_at")
+        .limit(5);
+      return data ?? [];
+    },
+  });
 
   if (isLoading) {
     return <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
@@ -200,6 +213,24 @@ export default function Live() {
         </CardContent>
       </Card>
 
+      {/* Próximos */}
+      {upcoming && upcoming.length > 1 && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Siguientes partidos</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {upcoming.slice(liveMatch.isLive ? 0 : 1).map((u: any) => (
+              <div key={u.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                <div className="min-w-0">
+                  <div className="text-xs text-muted-foreground">
+                    {format(new Date(u.kickoff_at), "EEE dd MMM · HH:mm", { locale: es })}
+                  </div>
+                  <div className="text-sm font-medium truncate">{u.team_a} vs {u.team_b}</div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
