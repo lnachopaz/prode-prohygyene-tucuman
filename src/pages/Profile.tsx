@@ -29,16 +29,28 @@ export default function Profile() {
   });
 
   const { data: stats } = useQuery({
-    queryKey: ["my-stats", user?.id],
+    queryKey: ["my-stats-detailed", user?.id],
     enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("leaderboard")
-        .select("*")
-        .eq("user_id", user!.id)
-        .maybeSingle();
+        .from("predictions")
+        .select("points, match:matches(status, score_a, score_b)")
+        .eq("user_id", user!.id);
       if (error) throw error;
-      return data;
+      const finished = (data ?? []).filter((r: any) => r.match && (r.match.status === "finished" || (r.match.score_a != null && r.match.score_b != null)));
+      const total = finished.reduce((s: number, r: any) => s + (r.points || 0), 0);
+      const exact = finished.filter((r: any) => r.points === 3).length;
+      const result = finished.filter((r: any) => r.points === 1).length;
+      const n = finished.length;
+      return {
+        total_points: total,
+        exact_hits: exact,
+        result_hits: result,
+        finished: n,
+        exact_pct: n ? Math.round((exact / n) * 100) : 0,
+        result_pct: n ? Math.round((result / n) * 100) : 0,
+        avg: n ? (total / n).toFixed(2) : "0.00",
+      };
     },
   });
 
@@ -63,10 +75,13 @@ export default function Profile() {
         <p className="text-muted-foreground">{user?.email}{isAdmin && " · Admin"}</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 grid-cols-2 sm:grid-cols-3">
         <StatCard label="Puntos totales" value={stats?.total_points ?? 0} />
         <StatCard label="Plenos" value={stats?.exact_hits ?? 0} />
         <StatCard label="Resultado" value={stats?.result_hits ?? 0} />
+        <StatCard label="% Exactos" value={`${stats?.exact_pct ?? 0}%`} />
+        <StatCard label="% Resultado" value={`${stats?.result_pct ?? 0}%`} />
+        <StatCard label="Prom. / partido" value={stats?.avg ?? "0.00"} />
       </div>
 
       <Card>
@@ -86,7 +101,7 @@ export default function Profile() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
     <Card>
       <CardContent className="p-4">
