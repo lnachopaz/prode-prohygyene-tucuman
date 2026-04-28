@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Save, Plus, Trash2, Calculator, Lock, MailCheck, FileDown, FileText } from "lucide-react";
+import { Loader2, RefreshCw, Save, Plus, Trash2, Calculator, Lock, MailCheck, FileDown, FileText, FlaskConical, Play, Square, Goal, RotateCcw } from "lucide-react";
 import { format, formatDistanceStrict } from "date-fns";
 import { es } from "date-fns/locale";
 import jsPDF from "jspdf";
