@@ -40,14 +40,22 @@ export default function Dashboard() {
   const { data: nextMatches } = useQuery({
     queryKey: ["dashboard-next-matches"],
     queryFn: async () => {
+      // Incluye partidos en vivo + próximos a arrancar (kickoff > ahora)
       const { data } = await supabase
         .from("matches")
         .select("*")
-        .gt("kickoff_at", new Date().toISOString())
+        .or(`status.eq.live,kickoff_at.gt.${new Date().toISOString()}`)
+        .order("status", { ascending: false }) // 'scheduled' < 'live' alfabéticamente, pero queremos live primero
         .order("kickoff_at")
         .limit(5);
-      return data ?? [];
+      // Reordenar manualmente: live primero, luego por kickoff
+      return (data ?? []).sort((a, b) => {
+        if (a.status === "live" && b.status !== "live") return -1;
+        if (b.status === "live" && a.status !== "live") return 1;
+        return new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime();
+      });
     },
+    refetchInterval: 30000, // refrescar cada 30s para captar partidos que pasan a en vivo
   });
 
   const { data: topRanking } = useQuery({
@@ -76,23 +84,39 @@ export default function Dashboard() {
         </Button>
       </div>
 
-      {/* Countdown next match */}
-      {nextMatches && nextMatches[0] && (
-        <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
-          <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-xs uppercase tracking-wider text-primary font-semibold mb-1 flex items-center gap-1">
-                <Radio className="h-3 w-3" /> Próximo partido
+      {/* Featured: live or next match */}
+      {nextMatches && nextMatches[0] && (() => {
+        const featured = nextMatches[0];
+        const isLive = featured.status === "live";
+        return (
+          <Card className={isLive ? "border-destructive/50 bg-gradient-to-br from-destructive/10 to-transparent" : "border-primary/30 bg-gradient-to-br from-primary/10 to-transparent"}>
+            <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className={`text-xs uppercase tracking-wider font-semibold mb-1 flex items-center gap-1 ${isLive ? "text-destructive" : "text-primary"}`}>
+                  <Radio className={`h-3 w-3 ${isLive ? "animate-pulse" : ""}`} />
+                  {isLive ? "En vivo ahora" : "Próximo partido"}
+                </div>
+                <div className="text-lg font-bold truncate">{featured.team_a} vs {featured.team_b}</div>
+                <div className="text-xs text-muted-foreground">
+                  {format(new Date(featured.kickoff_at), "EEEE dd MMM · HH:mm 'hs'", { locale: es })}
+                </div>
               </div>
-              <div className="text-lg font-bold truncate">{nextMatches[0].team_a} vs {nextMatches[0].team_b}</div>
-              <div className="text-xs text-muted-foreground">
-                {format(new Date(nextMatches[0].kickoff_at), "EEEE dd MMM · HH:mm 'hs'", { locale: es })}
-              </div>
-            </div>
-            <Countdown to={nextMatches[0].kickoff_at} />
-          </CardContent>
-        </Card>
-      )}
+              {isLive ? (
+                <div className="flex flex-col items-center md:items-end">
+                  <div className="text-3xl font-bold tabular-nums">
+                    {featured.score_a ?? 0} <span className="text-muted-foreground">-</span> {featured.score_b ?? 0}
+                  </div>
+                  <Button asChild size="sm" variant="outline" className="mt-2">
+                    <Link to="/live">Ver en vivo</Link>
+                  </Button>
+                </div>
+              ) : (
+                <Countdown to={featured.kickoff_at} />
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
