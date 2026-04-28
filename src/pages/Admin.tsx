@@ -257,9 +257,26 @@ function UsersAdmin() {
       const { data: profiles, error } = await supabase.from("profiles").select("*").order("display_name");
       if (error) throw error;
       const { data: roles } = await supabase.from("user_roles").select("*");
+      const { data: emails } = await supabase.rpc("list_users_with_email");
+      const { data: lb } = await supabase
+        .from("leaderboard")
+        .select("user_id, total_points, predictions_count")
+        .order("total_points", { ascending: false });
+      const rankMap = new Map<string, number>();
+      (lb ?? []).forEach((row: any, idx: number) => {
+        if (row.user_id) rankMap.set(row.user_id, idx + 1);
+      });
+      const lbMap = new Map<string, any>();
+      (lb ?? []).forEach((row: any) => row.user_id && lbMap.set(row.user_id, row));
+      const emailMap = new Map<string, string>();
+      (emails ?? []).forEach((row: any) => emailMap.set(row.id, row.email));
       return profiles.map((p) => ({
         ...p,
         is_admin: roles?.some((r) => r.user_id === p.id && r.role === "admin") ?? false,
+        email: emailMap.get(p.id) ?? "",
+        rank: rankMap.get(p.id) ?? null,
+        total_points: lbMap.get(p.id)?.total_points ?? 0,
+        predictions_count: lbMap.get(p.id)?.predictions_count ?? 0,
       }));
     },
   });
