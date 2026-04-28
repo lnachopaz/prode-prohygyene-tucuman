@@ -394,7 +394,7 @@ function UserRow({ user, onRename, onReject, onUnblock, onDelete }: any) {
             <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
           )}
           {user.status === "rejected" && (
-            <Button size="sm" onClick={onUnblock}>Desbloperar</Button>
+            <Button size="sm" onClick={onUnblock}>Desbloquear</Button>
           )}
           {!user.is_admin && (
             <Button size="sm" variant="destructive" onClick={onDelete}>Eliminar</Button>
