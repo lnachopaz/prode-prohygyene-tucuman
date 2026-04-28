@@ -24,10 +24,12 @@ export default function Admin() {
         <TabsList>
           <TabsTrigger value="matches">Partidos</TabsTrigger>
           <TabsTrigger value="users">Usuarios</TabsTrigger>
+          <TabsTrigger value="predictions">Pronósticos</TabsTrigger>
           <TabsTrigger value="codes">Códigos admin</TabsTrigger>
         </TabsList>
         <TabsContent value="matches" className="mt-4"><MatchesAdmin /></TabsContent>
         <TabsContent value="users" className="mt-4"><UsersAdmin /></TabsContent>
+        <TabsContent value="predictions" className="mt-4"><PredictionsAdmin /></TabsContent>
         <TabsContent value="codes" className="mt-4"><CodesAdmin /></TabsContent>
       </Tabs>
     </div>
@@ -405,6 +407,135 @@ function CodesAdmin() {
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
+
+function PredictionsAdmin() {
+  const [matchFilter, setMatchFilter] = useState<string>("all");
+  const [userFilter, setUserFilter] = useState<string>("all");
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-all-predictions"],
+    queryFn: async () => {
+      const [predsRes, matchesRes, profilesRes] = await Promise.all([
+        supabase.from("predictions").select("*").order("created_at", { ascending: false }),
+        supabase.from("matches").select("id, team_a, team_b, kickoff_at, score_a, score_b, status, stage").order("kickoff_at"),
+        supabase.from("profiles").select("id, display_name, status"),
+      ]);
+      if (predsRes.error) throw predsRes.error;
+      if (matchesRes.error) throw matchesRes.error;
+      if (profilesRes.error) throw profilesRes.error;
+      const matchMap = new Map((matchesRes.data ?? []).map((m: any) => [m.id, m]));
+      const profileMap = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p]));
+      return {
+        preds: predsRes.data ?? [],
+        matches: matchesRes.data ?? [],
+        profiles: profilesRes.data ?? [],
+        matchMap,
+        profileMap,
+      };
+    },
+  });
+
+  if (isLoading || !data) return <Loader2 className="h-6 w-6 animate-spin text-primary" />;
+
+  const filtered = data.preds.filter((p: any) => {
+    if (matchFilter !== "all" && p.match_id !== matchFilter) return false;
+    if (userFilter !== "all" && p.user_id !== userFilter) return false;
+    return true;
+  });
+
+  // Group by match
+  const grouped = new Map<string, any[]>();
+  filtered.forEach((p: any) => {
+    const arr = grouped.get(p.match_id) ?? [];
+    arr.push(p);
+    grouped.set(p.match_id, arr);
+  });
+
+  const groupedArr = Array.from(grouped.entries())
+    .map(([matchId, preds]) => ({ match: data.matchMap.get(matchId) as any, preds }))
+    .filter((g) => g.match)
+    .sort((a, b) => new Date(a.match.kickoff_at).getTime() - new Date(b.match.kickoff_at).getTime());
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <div className="min-w-[200px]">
+          <Label className="text-xs">Filtrar por partido</Label>
+          <Select value={matchFilter} onValueChange={setMatchFilter}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los partidos</SelectItem>
+              {data.matches.map((m: any) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {format(new Date(m.kickoff_at), "dd/MM")} · {m.team_a} vs {m.team_b}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="min-w-[200px]">
+          <Label className="text-xs">Filtrar por usuario</Label>
+          <Select value={userFilter} onValueChange={setUserFilter}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los usuarios</SelectItem>
+              {data.profiles.map((p: any) => (
+                <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {groupedArr.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No hay pronósticos para mostrar.</p>
+      ) : (
+        groupedArr.map(({ match, preds }) => (
+          <Card key={match.id}>
+            <CardHeader className="pb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base">{match.team_a} vs {match.team_b}</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    {format(new Date(match.kickoff_at), "dd/MM/yyyy HH:mm")} · {match.stage}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Resultado</p>
+                  <p className="font-bold">
+                    {match.score_a ?? "-"} - {match.score_b ?? "-"}
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-1">
+                {preds.map((p: any) => {
+                  const prof = data.profileMap.get(p.user_id) as any;
+                  return (
+                    <div key={p.id} className="flex items-center justify-between text-sm border-t border-border py-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{prof?.display_name ?? "Usuario"}</span>
+                        {prof?.status === "rejected" && <Badge variant="destructive" className="text-[10px]">Rechazado</Badge>}
+                        {prof?.status === "pending" && <Badge variant="secondary" className="text-[10px]">Pendiente</Badge>}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono">{p.pred_a} - {p.pred_b}</span>
+                        <Badge variant={p.points === 3 ? "default" : p.points === 1 ? "secondary" : "outline"} className="min-w-[50px] justify-center">
+                          {p.points} pt{p.points === 1 ? "" : "s"}
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        ))
+      )}
     </div>
   );
 }
