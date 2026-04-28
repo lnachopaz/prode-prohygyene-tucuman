@@ -61,13 +61,26 @@ export default function MatchDetails() {
     queryKey: ["match-predictions", id, locked],
     enabled: !!id && locked,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: preds, error } = await supabase
         .from("predictions")
-        .select("user_id, pred_a, pred_b, points, profiles!inner(display_name, avatar_url)")
+        .select("user_id, pred_a, pred_b, points")
         .eq("match_id", id!)
         .order("points", { ascending: false });
       if (error) throw error;
-      return data as unknown as PredictionRow[];
+      const userIds = Array.from(new Set((preds ?? []).map((p) => p.user_id)));
+      let profilesMap = new Map<string, { display_name: string; avatar_url: string | null }>();
+      if (userIds.length > 0) {
+        const { data: profs, error: pErr } = await supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url")
+          .in("id", userIds);
+        if (pErr) throw pErr;
+        profs?.forEach((p) => profilesMap.set(p.id, { display_name: p.display_name, avatar_url: p.avatar_url }));
+      }
+      return (preds ?? []).map((p) => ({
+        ...p,
+        profiles: profilesMap.get(p.user_id) ?? null,
+      })) as PredictionRow[];
     },
   });
 
