@@ -253,10 +253,12 @@ export default function Predictions() {
 
 function MatchCard({
   match,
+  allMatches,
   prediction,
   onSaved,
 }: {
   match: Match;
+  allMatches: Match[];
   prediction?: Prediction;
   onSaved: () => void;
 }) {
@@ -268,7 +270,13 @@ function MatchCard({
     const t = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(t);
   }, []);
-  const locked = !isAfter(lockAt, now) || match.status !== "scheduled";
+  const timeLocked = !isAfter(lockAt, now) || match.status !== "scheduled";
+  const unlockTrigger = useMemo(
+    () => getUnlockTrigger(match, allMatches),
+    [match, allMatches],
+  );
+  const roundOpen = !unlockTrigger || now.getTime() >= unlockTrigger.unlocksAt.getTime();
+  const locked = timeLocked || !roundOpen;
 
   const [a, setA] = useState<string>(prediction?.pred_a?.toString() ?? "");
   const [b, setB] = useState<string>(prediction?.pred_b?.toString() ?? "");
@@ -283,6 +291,7 @@ function MatchCard({
 
   async function handleSave() {
     if (!user) return;
+    if (!roundOpen) return toast.error("Esta ronda todavía no está disponible");
     const pa = parseInt(a, 10);
     const pb = parseInt(b, 10);
     if (isNaN(pa) || isNaN(pb) || pa < 0 || pb < 0) {
@@ -304,7 +313,8 @@ function MatchCard({
   const statusBadge = () => {
     if (match.status === "live") return <Badge className="bg-destructive text-destructive-foreground">EN VIVO</Badge>;
     if (match.status === "finished") return <Badge variant="secondary">Finalizado</Badge>;
-    if (locked) return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Cerrado</Badge>;
+    if (!roundOpen) return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Bloqueado</Badge>;
+    if (timeLocked) return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Cerrado</Badge>;
     return <Badge variant="outline">{format(new Date(match.kickoff_at), "HH:mm")}</Badge>;
   };
 
