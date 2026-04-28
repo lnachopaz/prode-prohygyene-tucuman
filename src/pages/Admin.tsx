@@ -242,8 +242,12 @@ function UsersAdmin() {
   }
 
   async function setStatus(userId: string, status: "approved" | "rejected" | "pending") {
-    const { error } = await supabase.from("profiles").update({ status }).eq("id", userId);
-    if (error) return toast.error(error.message);
+    const { data, error } = await supabase.functions.invoke("admin-users", {
+      body: { action: "update_status", user_id: userId, status },
+    });
+    if (error || (data as any)?.error) {
+      return toast.error((data as any)?.error ?? error?.message ?? "No se pudo actualizar el estado");
+    }
     toast.success(status === "approved" ? "Usuario aprobado" : status === "rejected" ? "Usuario rechazado" : "Marcado como pendiente");
     qc.invalidateQueries({ queryKey: ["admin-users"] });
   }
