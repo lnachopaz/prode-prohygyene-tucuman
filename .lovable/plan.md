@@ -1,90 +1,72 @@
-# Goles y tarjetas en vivo
 
-Hoy el Live ya trae **marcador y estado** desde Football-Data.org, pero no muestra los **eventos del partido** (quién metió el gol, en qué minuto, tarjetas amarillas/rojas). Vamos a sumarlo.
+## Cambios a implementar
 
-## Qué vas a ver en Live
+### 1. Aviso cuando se confirmó el email
+**Auth.tsx + Pending.tsx**
+- Detectar el callback de Supabase tras confirmar el email (la URL viene con `?type=signup` o un access_token en el hash) y mostrar un toast verde: "✅ Email confirmado. Tu cuenta está esperando aprobación del admin."
+- En `Pending.tsx`, agregar un banner indicando que el email ya está verificado y solo falta la aprobación del admin.
+- En `Admin > Usuarios pendientes`, mostrar un badge `Email verificado` (leyendo `email_confirmed_at` vía una función edge `list-pending-users` con service role, ya que `auth.users` no es accesible desde el cliente).
 
-Debajo del marcador, una **timeline cronológica** del partido:
+### 2. Puntaje parcial en vivo en la card del Live
+**src/pages/Live.tsx**
+- Cargar la predicción del usuario actual para el partido en vivo (`predictions` filtrado por `user_id` y `match_id`).
+- Calcular en cliente los puntos parciales con el marcador actual (3 si exacto, 1 si acierta resultado, 0 si no) usando la misma lógica que `calc_points`.
+- Mostrar dentro de la card: "Tu pronóstico: 2-1 · **Parcial: +3 pts**" con un badge verde/gris/outline según corresponda.
+- Si el usuario no pronosticó: mostrar "No pronosticaste este partido".
+
+### 3. Panel admin: logs de sync
+**Nueva tabla `sync_logs`** (migración):
+- `id uuid pk`, `function_name text`, `started_at timestamptz`, `finished_at timestamptz`, `status text` ('success'|'error'|'partial'), `updated_count int`, `error_message text`, `details jsonb` (con el array de results por partido).
+- RLS: solo admin puede SELECT; INSERT vía service role (edge functions).
+
+**Edge functions `sync-matches` y `sync-live-matches`**:
+- Al iniciar, insertar un row con `status='running'`. Al terminar, actualizar con resultado, contadores y `details`.
+
+**Admin.tsx**: nueva pestaña **"Sync"** que muestra los últimos 20 runs (función, hora, duración, estado, partidos actualizados, errores expandibles en accordion).
+
+### 4. Forzar recálculo de puntos de un partido
+**Migración**: nueva función `recalc_match_points(_match_id uuid)` SECURITY DEFINER que ejecuta el mismo `update predictions ... set points = calc_points(...)` para ese partido (solo invocable por admin vía RLS check interno con `has_role`).
+
+**Admin.tsx > MatchAdminRow**: nuevo botón "Recalcular puntos" que llama a `supabase.rpc('recalc_match_points', { _match_id: m.id })` y muestra cuántas predicciones se actualizaron.
+
+### 5. Bloquear/desbloquear pronósticos manualmente
+**Migración**: agregar columna `predictions_locked boolean default false` a `matches`.
+
+**Actualizar policies de `predictions`**:
+- `predictions_insert_own_unlocked` y `predictions_update_own_unlocked`: agregar condición `and m.predictions_locked = false`.
+
+**Admin.tsx > MatchAdminRow**: toggle/switch "🔒 Bloqueado" que actualiza ese campo. Mostrar el estado claramente.
+
+**Predictions.tsx**: si `predictions_locked` está en true, deshabilitar inputs y mostrar leyenda "Pronósticos bloqueados por el admin".
+
+### 6. Export del ranking final a CSV/PDF
+**Admin.tsx**: nueva sección dentro de la pestaña "Sync" (o nueva "Export") con dos botones:
+- **Exportar CSV**: arma en cliente un CSV con `posición, nombre, puntos, exactos, resultados, partidos jugados` y lo descarga con un `Blob`.
+- **Exportar PDF**: usa `jspdf` + `jspdf-autotable` (agregar dependencias) para generar un PDF con título "Ranking Final – Mundial 2026", logo de ProHygiene y tabla con las mismas columnas.
+- Ambos toman los datos agregados del mismo modo que `Ranking.tsx` (predicciones + matches finalizados).
+
+## Detalles técnicos
 
 ```text
- 90' 🟨 Casemiro (MUN)
- 78' ⚽ Mbeumo (BRE)        2 - 1
- 65' 🟥 Højlund (MUN)
- 42' ⚽ Rashford (MUN)      2 - 0
- 18' ⚽ Fernandes (MUN)     1 - 0
+DB
+├── sync_logs (nueva tabla)
+├── matches.predictions_locked (nueva columna)
+└── recalc_match_points(_match_id) (nueva función RPC)
+
+Edge Functions
+├── sync-matches: + log start/end en sync_logs
+├── sync-live-matches: + log start/end en sync_logs
+└── list-pending-users (nueva): devuelve perfiles pending + email_confirmed_at
+
+Frontend
+├── Auth.tsx: detectar confirmación de email → toast
+├── Pending.tsx: banner "email verificado, esperando aprobación"
+├── Live.tsx: card con "Tu pronóstico vs marcador en vivo · +X pts"
+├── Predictions.tsx: respetar predictions_locked
+└── Admin.tsx
+    ├── tab Partidos: switch lock + botón recalcular por fila
+    ├── tab Usuarios: badge "email verificado"
+    └── tab Sync: tabla de logs + export CSV/PDF
 ```
 
-- ⚽ Goles con jugador, minuto y marcador resultante
-- 🟨 Amarillas / 🟥 Rojas con jugador y minuto
-- Se actualiza junto al marcador (cada 30s mientras estás mirando)
-- Si el partido todavía no arrancó: no se muestra la sección
-- Si arrancó pero no hay eventos: "Sin eventos todavía"
-
-## Cómo se va a hacer (técnico)
-
-### 1. Nueva tabla `match_events`
-
-Guarda los eventos para no depender de la API en cada refresh y poder mostrar histórico.
-
-```text
-match_events
-├─ id (uuid)
-├─ match_id (uuid → matches.id)
-├─ minute (int)              -- minuto del partido
-├─ type (text)               -- 'goal' | 'yellow_card' | 'red_card' | 'substitution'
-├─ team (text)               -- 'home' | 'away'
-├─ player (text)             -- nombre del jugador
-├─ score_home (int, null)    -- marcador después del evento (solo goles)
-├─ score_away (int, null)
-├─ external_id (text unique) -- id del evento en Football-Data, evita duplicados
-└─ created_at
-```
-
-- RLS: SELECT abierto a usuarios aprobados, INSERT/UPDATE solo service_role (la edge function).
-- Índice en `(match_id, minute)`.
-
-### 2. Edge Function `sync-live-matches` (extender la existente)
-
-Football-Data v4 devuelve en `/matches/{id}` los arrays:
-- `goals[]` → `{ minute, scorer.name, team.name, score.home, score.away }`
-- `bookings[]` → `{ minute, player.name, card: 'YELLOW' | 'RED', team.name }`
-
-La función va a:
-1. Traer el partido como ya hace.
-2. Mapear `goals` y `bookings` a filas de `match_events` con `external_id` único (ej: `fd-538122-goal-42-Rashford`).
-3. Hacer `upsert` con `onConflict: 'external_id'` → idempotente, no duplica.
-4. Devolver el conteo de eventos sincronizados además de los marcadores.
-
-### 3. Frontend: nuevo componente `MatchTimeline`
-
-En `src/pages/Live.tsx`, debajo del marcador y antes de "Pronósticos del grupo":
-
-- Query `match-events` filtrada por `matchId`, `refetchInterval: 30_000`.
-- Render ordenado por `minute` descendente (lo más reciente arriba).
-- Iconos: `Goal` de lucide para ⚽, `Square` amarillo/rojo para tarjetas.
-- Solo se muestra si `started === true`.
-
-### 4. Realtime (opcional pero copado)
-
-Habilitar realtime sobre `match_events` para que los goles aparezcan **al instante** en todos los dispositivos abiertos, sin esperar al próximo polling de 30s:
-
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.match_events;
-```
-
-Y en `Live.tsx` un `supabase.channel('match-events').on('postgres_changes', ...)` que invalide la query cuando llega un INSERT.
-
-## Limitaciones honestas
-
-- **Football-Data plan free** (10 req/min): el detalle de eventos solo viene en `/matches/{id}`, ya lo estamos pidiendo. Ok.
-- **Latencia**: Football-Data suele tener los goles cargados ~30-90s después del evento real. No es ESPN, pero es lo mejor gratis.
-- **Tarjetas**: a veces vienen unos minutos tarde o sin nombre del jugador completo. Lo manejo con fallbacks.
-- Solo funciona para partidos con `external_id` que empieza con `fd-` (los del Mundial, una vez los vinculemos).
-
-## Pasos de implementación
-
-1. Migración: crear tabla `match_events` + RLS + índice + agregar a `supabase_realtime`.
-2. Actualizar edge function `sync-live-matches` para extraer y upsertear eventos.
-3. Crear componente `MatchTimeline.tsx`.
-4. Integrarlo en `Live.tsx` + suscripción realtime.
-5. Probar con el partido de prueba (Manchester United vs Brentford si todavía está vinculado, o lo re-vinculamos a un partido en curso).
+Dependencias nuevas: `jspdf`, `jspdf-autotable`.
