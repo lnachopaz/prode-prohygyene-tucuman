@@ -74,6 +74,8 @@ export default function Auth() {
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return toast.error("Ingresá tu nombre");
+    if (!passwordValid) return toast.error("La contraseña no cumple los requisitos");
+    if (!passwordsMatch) return toast.error("Las contraseñas no coinciden");
     setBusy(true);
     const { error } = await supabase.auth.signUp({
       email,
