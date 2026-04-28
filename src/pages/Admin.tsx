@@ -99,6 +99,7 @@ function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }
   const [busy, setBusy] = useState(false);
   const [recalcBusy, setRecalcBusy] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
+  const lockMode: "auto" | "force_open" | "force_closed" = match.predictions_lock_mode ?? "auto";
 
   async function save() {
     setBusy(true);
@@ -130,12 +131,17 @@ function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }
     onChange();
   }
 
-  async function toggleLock(checked: boolean) {
+  async function changeLockMode(mode: "auto" | "force_open" | "force_closed") {
     setLockBusy(true);
-    const { error } = await supabase.from("matches").update({ predictions_locked: checked }).eq("id", match.id);
+    const { error } = await supabase.from("matches").update({ predictions_lock_mode: mode }).eq("id", match.id);
     setLockBusy(false);
     if (error) return toast.error(error.message);
-    toast.success(checked ? "Pronósticos bloqueados" : "Pronósticos desbloqueados");
+    const labels = {
+      auto: "Modo automático (cierra 1h antes)",
+      force_open: "Pronósticos forzados a ABIERTO",
+      force_closed: "Pronósticos forzados a CERRADO",
+    } as const;
+    toast.success(labels[mode]);
     onChange();
   }
 
@@ -173,11 +179,19 @@ function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }
             </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-muted-foreground">Bloquear pronósticos manualmente</span>
-          <Switch checked={!!match.predictions_locked} onCheckedChange={toggleLock} disabled={lockBusy} />
-          {match.predictions_locked && <Badge variant="destructive" className="text-[10px]">BLOQUEADO</Badge>}
+          <span className="text-muted-foreground">Pronósticos:</span>
+          <Select value={lockMode} onValueChange={(v) => changeLockMode(v as any)} disabled={lockBusy}>
+            <SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">Automático (1h antes)</SelectItem>
+              <SelectItem value="force_open">Forzar abierto</SelectItem>
+              <SelectItem value="force_closed">Forzar cerrado</SelectItem>
+            </SelectContent>
+          </Select>
+          {lockMode === "force_open" && <Badge className="text-[10px] bg-green-600 hover:bg-green-600">ABIERTO MANUAL</Badge>}
+          {lockMode === "force_closed" && <Badge variant="destructive" className="text-[10px]">CERRADO MANUAL</Badge>}
         </div>
       </CardContent>
     </Card>
