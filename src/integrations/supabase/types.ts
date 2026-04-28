@@ -35,6 +35,53 @@ export type Database = {
         }
         Relationships: []
       }
+      match_events: {
+        Row: {
+          created_at: string
+          external_id: string | null
+          id: string
+          match_id: string
+          minute: number
+          player: string | null
+          score_away: number | null
+          score_home: number | null
+          team: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          match_id: string
+          minute?: number
+          player?: string | null
+          score_away?: number | null
+          score_home?: number | null
+          team: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          match_id?: string
+          minute?: number
+          player?: string | null
+          score_away?: number | null
+          score_home?: number | null
+          team?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_events_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matches: {
         Row: {
           created_at: string
