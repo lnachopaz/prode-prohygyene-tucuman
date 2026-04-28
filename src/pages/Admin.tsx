@@ -48,10 +48,11 @@ function MatchesAdmin() {
 
   async function syncFromApi() {
     setSyncing(true);
-    const { data, error } = await supabase.functions.invoke("sync-matches");
+    const { data, error } = await supabase.functions.invoke("sync-fixture");
     setSyncing(false);
     if (error) return toast.error(error.message);
-    toast.success((data as any)?.message ?? "Sincronizado");
+    const d = data as any;
+    toast.success(d?.ok ? `Fixture sincronizado: ${d.total} partidos` : (d?.message ?? "Sincronizado"));
     qc.invalidateQueries({ queryKey: ["admin-matches"] });
     qc.invalidateQueries({ queryKey: ["matches"] });
   }
@@ -61,7 +62,7 @@ function MatchesAdmin() {
       <div className="flex flex-wrap gap-2">
         <Button onClick={syncFromApi} disabled={syncing}>
           {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-          Sincronizar desde TheSportsDB
+          Sincronizar fixture (Football-Data)
         </Button>
         <NewMatchDialog onCreated={() => qc.invalidateQueries({ queryKey: ["admin-matches"] })} />
       </div>
