@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Loader2, MailCheck } from "lucide-react";
+import { Loader2, MailCheck, Eye, EyeOff, Check, X } from "lucide-react";
 import logo from "@/assets/prohygiene-logo.png";
 
 export default function Auth() {
@@ -25,7 +25,23 @@ export default function Auth() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [adminCode, setAdminCode] = useState("");
+
+  // visibility toggles
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showSignupPasswordConfirm, setShowSignupPasswordConfirm] = useState(false);
+
+  // password rules (en tiempo real)
+  const passwordRules = [
+    { label: "Al menos 8 caracteres", test: (p: string) => p.length >= 8 },
+    { label: "Una letra mayúscula", test: (p: string) => /[A-Z]/.test(p) },
+    { label: "Una letra minúscula", test: (p: string) => /[a-z]/.test(p) },
+    { label: "Un número", test: (p: string) => /\d/.test(p) },
+  ];
+  const passwordValid = passwordRules.every((r) => r.test(password));
+  const passwordsMatch = password.length > 0 && password === passwordConfirm;
 
   // Detectar callback de confirmación de email (Supabase devuelve type=signup en hash o query)
   useEffect(() => {
@@ -58,6 +74,8 @@ export default function Auth() {
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return toast.error("Ingresá tu nombre");
+    if (!passwordValid) return toast.error("La contraseña no cumple los requisitos");
+    if (!passwordsMatch) return toast.error("Las contraseñas no coinciden");
     setBusy(true);
     const { error } = await supabase.auth.signUp({
       email,
@@ -134,7 +152,25 @@ export default function Auth() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="loginPassword">Contraseña</Label>
-                    <Input id="loginPassword" type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
+                    <div className="relative">
+                      <Input
+                        id="loginPassword"
+                        type={showLoginPassword ? "text" : "password"}
+                        required
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword((v) => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showLoginPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        tabIndex={-1}
+                      >
+                        {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                   <Button type="submit" className="w-full" disabled={busy}>
                     {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -157,7 +193,71 @@ export default function Auth() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signupPassword">Contraseña</Label>
-                    <Input id="signupPassword" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <div className="relative">
+                      <Input
+                        id="signupPassword"
+                        type={showSignupPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSignupPassword((v) => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showSignupPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        tabIndex={-1}
+                      >
+                        {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <ul className="space-y-1 rounded-md border bg-muted/30 p-2 text-xs">
+                      {passwordRules.map((rule) => {
+                        const ok = rule.test(password);
+                        return (
+                          <li
+                            key={rule.label}
+                            className={`flex items-center gap-2 ${ok ? "text-success" : "text-muted-foreground"}`}
+                          >
+                            {ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                            <span>{rule.label}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signupPasswordConfirm">Repetir contraseña</Label>
+                    <div className="relative">
+                      <Input
+                        id="signupPasswordConfirm"
+                        type={showSignupPasswordConfirm ? "text" : "password"}
+                        required
+                        value={passwordConfirm}
+                        onChange={(e) => setPasswordConfirm(e.target.value)}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSignupPasswordConfirm((v) => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showSignupPasswordConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        tabIndex={-1}
+                      >
+                        {showSignupPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {passwordConfirm.length > 0 && (
+                      <p
+                        className={`flex items-center gap-2 text-xs ${
+                          passwordsMatch ? "text-success" : "text-destructive"
+                        }`}
+                      >
+                        {passwordsMatch ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                        {passwordsMatch ? "Las contraseñas coinciden" : "Las contraseñas no coinciden"}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="adminCode">Código de admin (opcional)</Label>
