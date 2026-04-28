@@ -303,6 +303,13 @@ export type Database = {
         }[]
       }
       recalc_match_points: { Args: { _match_id: string }; Returns: number }
+      set_user_status: {
+        Args: {
+          _status: Database["public"]["Enums"]["user_status"]
+          _user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "user"
