@@ -106,11 +106,14 @@ export default function Predictions() {
       if (predStatusFilter !== "all") {
         const p = predMap.get(m.id);
         const lockAt = subHours(new Date(m.kickoff_at), 1);
-        const locked = !isAfter(lockAt, now) || m.status !== "scheduled";
+        const timeLocked = !isAfter(lockAt, now) || m.status !== "scheduled";
+        const roundOpen = isRoundUnlocked(m, matches, now);
+        const locked = timeLocked || !roundOpen;
         if (predStatusFilter === "loaded" && !p) return false;
         if (predStatusFilter === "missing" && p) return false;
-        if (predStatusFilter === "open" && locked) return false;
-        if (predStatusFilter === "locked" && !locked) return false;
+        if (predStatusFilter === "open" && (locked || !roundOpen)) return false;
+        if (predStatusFilter === "locked" && !timeLocked) return false;
+        if (predStatusFilter === "round_locked" && roundOpen) return false;
         if (predStatusFilter === "finished" && m.status !== "finished") return false;
       }
       return true;
