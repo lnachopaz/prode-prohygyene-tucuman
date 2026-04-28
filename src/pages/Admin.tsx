@@ -199,12 +199,25 @@ function UsersAdmin() {
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      const { data: profiles, error } = await supabase.from("profiles").select("*").order("display_name");
+      const [{ data: profiles, error }, { data: roles }, { data: lb }, emailsRes] = await Promise.all([
+        supabase.from("profiles").select("*").order("display_name"),
+        supabase.from("user_roles").select("*"),
+        supabase.from("leaderboard").select("user_id, total_points, predictions_count").order("total_points", { ascending: false }),
+        supabase.functions.invoke("admin-users", { body: { action: "list_users" } }),
+      ]);
       if (error) throw error;
-      const { data: roles } = await supabase.from("user_roles").select("*");
+      const emails: Record<string, string> = (emailsRes.data as any)?.emails ?? {};
+      const rankMap = new Map<string, { rank: number; points: number; count: number }>();
+      (lb ?? []).forEach((row: any, i: number) => {
+        rankMap.set(row.user_id, { rank: i + 1, points: row.total_points, count: row.predictions_count });
+      });
       return profiles.map((p) => ({
         ...p,
+        email: emails[p.id] ?? "",
         is_admin: roles?.some((r) => r.user_id === p.id && r.role === "admin") ?? false,
+        rank: rankMap.get(p.id)?.rank ?? null,
+        points: rankMap.get(p.id)?.points ?? 0,
+        predictions_count: rankMap.get(p.id)?.count ?? 0,
       }));
     },
   });
@@ -235,6 +248,19 @@ function UsersAdmin() {
     qc.invalidateQueries({ queryKey: ["admin-users"] });
   }
 
+  async function deleteUser(userId: string, name: string) {
+    if (!confirm(`¿Eliminar definitivamente a ${name}? Esta acción no se puede deshacer y borrará sus pronósticos.`)) return;
+    const { data, error } = await supabase.functions.invoke("admin-users", {
+      body: { action: "delete_user", user_id: userId },
+    });
+    if (error || (data as any)?.error) {
+      return toast.error((data as any)?.error ?? error?.message ?? "Error eliminando");
+    }
+    toast.success("Usuario eliminado");
+    qc.invalidateQueries({ queryKey: ["admin-users"] });
+    qc.invalidateQueries({ queryKey: ["leaderboard"] });
+  }
+
   if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-primary" />;
 
   const pending = users?.filter((u: any) => u.status === "pending") ?? [];
@@ -255,10 +281,14 @@ function UsersAdmin() {
               <CardContent className="p-3 flex flex-wrap items-center gap-2">
                 <div className="flex-1 min-w-[180px]">
                   <p className="font-medium">{u.display_name}</p>
+                  {u.email && <p className="text-xs text-muted-foreground">{u.email}</p>}
                   <p className="text-xs text-muted-foreground">Solicitado: {format(new Date(u.created_at), "dd/MM/yyyy HH:mm")}</p>
                 </div>
                 <Button size="sm" onClick={() => setStatus(u.id, "approved")}>Aprobar</Button>
                 <Button size="sm" variant="destructive" onClick={() => setStatus(u.id, "rejected")}>Rechazar</Button>
+                <Button size="sm" variant="ghost" onClick={() => deleteUser(u.id, u.display_name)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
               </CardContent>
             </Card>
           ))
@@ -274,6 +304,7 @@ function UsersAdmin() {
             onRename={(n: string) => rename(u.id, n)}
             onToggleAdmin={() => toggleAdmin(u.id, !u.is_admin)}
             onReject={() => setStatus(u.id, "rejected")}
+            onDelete={() => deleteUser(u.id, u.display_name)}
           />
         ))}
       </div>
@@ -281,21 +312,32 @@ function UsersAdmin() {
   );
 }
 
-function UserRow({ user, onRename, onToggleAdmin, onReject }: any) {
+function UserRow({ user, onRename, onToggleAdmin, onReject, onDelete }: any) {
   const [name, setName] = useState(user.display_name);
   return (
     <Card>
-      <CardContent className="p-3 flex flex-wrap items-center gap-2">
-        <Input className="flex-1 min-w-[180px]" value={name} onChange={(e) => setName(e.target.value)} />
-        <Button size="sm" variant="outline" onClick={() => onRename(name)}>Guardar</Button>
-        {user.is_admin && <Badge>Admin</Badge>}
-        {user.status === "rejected" && <Badge variant="destructive">Rechazado</Badge>}
-        <Button size="sm" variant={user.is_admin ? "destructive" : "default"} onClick={onToggleAdmin}>
-          {user.is_admin ? "Quitar admin" : "Hacer admin"}
-        </Button>
-        {user.status === "approved" && !user.is_admin && (
-          <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
-        )}
+      <CardContent className="p-3 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Input className="flex-1 min-w-[180px]" value={name} onChange={(e) => setName(e.target.value)} />
+          <Button size="sm" variant="outline" onClick={() => onRename(name)}>Guardar</Button>
+          {user.is_admin && <Badge>Admin</Badge>}
+          {user.status === "rejected" && <Badge variant="destructive">Rechazado</Badge>}
+          <Button size="sm" variant={user.is_admin ? "destructive" : "default"} onClick={onToggleAdmin}>
+            {user.is_admin ? "Quitar admin" : "Hacer admin"}
+          </Button>
+          {user.status === "approved" && !user.is_admin && (
+            <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={onDelete}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          {user.email && <span>📧 {user.email}</span>}
+          <span>🏆 {user.rank ? `#${user.rank}` : "—"}</span>
+          <span>⭐ {user.points} pts</span>
+          <span>📝 {user.predictions_count} pronósticos</span>
+        </div>
       </CardContent>
     </Card>
   );
