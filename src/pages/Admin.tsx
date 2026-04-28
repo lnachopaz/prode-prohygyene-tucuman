@@ -292,7 +292,7 @@ function UsersAdmin() {
   }
 
   async function setStatus(userId: string, status: "approved" | "rejected" | "pending") {
-    const { error } = await supabase.from("profiles").update({ status }).eq("id", userId);
+    const { error } = await supabase.rpc("set_user_status", { _user_id: userId, _status: status });
     if (error) return toast.error(error.message);
     toast.success(status === "approved" ? "Usuario aprobado" : status === "rejected" ? "Usuario rechazado" : "Marcado como pendiente");
     qc.invalidateQueries({ queryKey: ["admin-users"] });
