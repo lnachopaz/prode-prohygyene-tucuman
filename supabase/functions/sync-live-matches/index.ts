@@ -1,7 +1,6 @@
-// Sincroniza partidos con TheSportsDB (gratis e ilimitado).
-// Busca partidos por fecha y matchea por nombre de equipos.
-// Actualiza marcador/estado de partidos en vivo y próximos.
-// Registra cada ejecución en sync_logs.
+// Sincroniza partidos en vivo / próximos con Football-Data.org.
+// Usa external_id (formato "fd-<id>") para llamar 1 vez por partido relevante.
+// Actualiza marcador, estado y goleadores. Registra cada ejecución en sync_logs.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -9,48 +8,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// API pública gratuita. Key "3" = test key (sin límite documentado para uso razonable).
-const TSDB_BASE = "https://www.thesportsdb.com/api/v1/json/3";
+const FD_BASE = "https://api.football-data.org/v4";
 
-// Estados que TheSportsDB devuelve en strStatus
-// In-play: "1H", "2H", "HT", "ET", "P" (penales), "BT" (break)
-// Finished: "FT", "AET", "PEN", "Match Finished"
-// Scheduled: "NS", "Not Started", "" (vacío), null
+// Mapea status de Football-Data a nuestro enum
 function mapStatus(s: string | null | undefined): "scheduled" | "live" | "finished" {
   if (!s) return "scheduled";
-  const v = s.toUpperCase().trim();
-  if (["FT", "AET", "PEN", "MATCH FINISHED", "FINISHED", "AWARDED"].includes(v)) return "finished";
-  if (["NS", "NOT STARTED", "TBD", "POSTPONED", "CANCELLED", "SUSPENDED"].includes(v)) return "scheduled";
-  // Cualquier otro string no vacío suele indicar partido en juego (1H, 2H, HT, ET, P, BT, "Live", etc.)
-  return "live";
-}
-
-// Normaliza nombres de equipos para hacer matching robusto.
-// TheSportsDB usa "Paris SG", nosotros "Paris Saint-Germain", etc.
-function normalizeTeam(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quita acentos
-    .replace(/\bfc\b|\bcf\b|\bsc\b|\bac\b|\bclub\b/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-// Devuelve true si dos nombres de equipo "matchean" (uno contiene tokens claves del otro).
-function teamsMatch(a: string, b: string): boolean {
-  const na = normalizeTeam(a);
-  const nb = normalizeTeam(b);
-  if (na === nb) return true;
-  // Tokens clave (ignorando palabras genéricas)
-  const stop = new Set(["de", "la", "el", "los", "las", "the", "and", "y", "of", "munich", "city", "united", "real"]);
-  const tokensA = na.split(" ").filter((t) => t.length >= 3 && !stop.has(t));
-  const tokensB = nb.split(" ").filter((t) => t.length >= 3 && !stop.has(t));
-  // Si comparten al menos un token significativo de 4+ chars
-  for (const t of tokensA) {
-    if (t.length >= 4 && tokensB.includes(t)) return true;
-  }
-  // O si uno está contenido en el otro
-  return na.includes(nb) || nb.includes(na);
+  const v = s.toUpperCase();
+  if (["FINISHED", "AWARDED"].includes(v)) return "finished";
+  if (["IN_PLAY", "PAUSED", "LIVE"].includes(v)) return "live";
+  return "scheduled";
 }
 
 Deno.serve(async (req) => {
@@ -58,6 +24,7 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const apiKey = Deno.env.get("FOOTBALL_DATA_API_KEY");
   const admin = createClient(supabaseUrl, serviceKey);
 
   const { data: logRow } = await admin
@@ -72,10 +39,18 @@ Deno.serve(async (req) => {
     await admin.from("sync_logs").update({ ...patch, finished_at: new Date().toISOString() }).eq("id", logId);
   }
 
+  if (!apiKey) {
+    await finishLog({ status: "error", error_message: "FOOTBALL_DATA_API_KEY no configurada" });
+    return new Response(JSON.stringify({ error: "FOOTBALL_DATA_API_KEY no configurada" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
-    // Solo sincronizamos partidos relevantes:
+    // Sincronizamos solo partidos relevantes:
     // - status 'live'
-    // - status 'scheduled' que arrancan dentro de 30 min, o que ya arrancaron (hasta 4h atrás)
+    // - status 'scheduled' que arrancan dentro de 30 min, o iniciados hasta hace 4h
     const now = new Date();
     const nowIso = now.toISOString();
     const soonIso = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
@@ -83,15 +58,17 @@ Deno.serve(async (req) => {
 
     const { data: liveMatches } = await admin
       .from("matches")
-      .select("id, team_a, team_b, kickoff_at, status")
-      .eq("status", "live");
+      .select("id, team_a, team_b, external_id, status")
+      .eq("status", "live")
+      .not("external_id", "is", null);
 
     const { data: soonMatches } = await admin
       .from("matches")
-      .select("id, team_a, team_b, kickoff_at, status")
+      .select("id, team_a, team_b, external_id, status")
       .eq("status", "scheduled")
       .gte("kickoff_at", recentPastIso)
-      .lte("kickoff_at", soonIso);
+      .lte("kickoff_at", soonIso)
+      .not("external_id", "is", null);
 
     const seen = new Set<string>();
     const matches = [...(liveMatches ?? []), ...(soonMatches ?? [])].filter((m) => {
@@ -108,85 +85,83 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Agrupar partidos por fecha (YYYY-MM-DD en UTC) para hacer 1 sola llamada por día.
-    const byDate = new Map<string, typeof matches>();
-    for (const m of matches) {
-      const date = new Date(m.kickoff_at).toISOString().slice(0, 10);
-      const arr = byDate.get(date) ?? [];
-      arr.push(m);
-      byDate.set(date, arr);
-    }
+    const results: Array<{ id: string; ok: boolean; status?: string; score?: string; goals?: number; error?: string }> = [];
 
-    // Cache de eventos por fecha
-    const eventsByDate = new Map<string, any[]>();
-    for (const date of byDate.keys()) {
+    // Football-Data free: 10 req/min => 6s entre llamadas. Usamos 6.5s para margen.
+    const DELAY_MS = matches.length > 1 ? 6500 : 0;
+
+    for (let i = 0; i < matches.length; i++) {
+      const m = matches[i];
       try {
-        const r = await fetch(`${TSDB_BASE}/eventsday.php?d=${date}&s=Soccer`);
+        const fdId = (m.external_id ?? "").replace(/^fd-/, "");
+        if (!fdId) {
+          results.push({ id: m.id, ok: false, error: "external_id sin prefijo fd-" });
+          continue;
+        }
+
+        const r = await fetch(`${FD_BASE}/matches/${fdId}`, {
+          headers: { "X-Auth-Token": apiKey },
+        });
+
         if (!r.ok) {
-          eventsByDate.set(date, []);
-          continue;
-        }
-        const data = await r.json();
-        eventsByDate.set(date, Array.isArray(data?.events) ? data.events : []);
-      } catch (_e) {
-        eventsByDate.set(date, []);
-      }
-    }
+          const txt = await r.text();
+          results.push({ id: m.id, ok: false, error: `HTTP ${r.status}: ${txt.slice(0, 120)}` });
+        } else {
+          const data = await r.json();
+          const newStatus = mapStatus(data.status);
+          const score_a = data.score?.fullTime?.home ?? null;
+          const score_b = data.score?.fullTime?.away ?? null;
 
-    const results: Array<{ id: string; ok: boolean; status?: string; score?: string; matched?: string; error?: string }> = [];
+          const { error: upErr } = await admin
+            .from("matches")
+            .update({
+              status: newStatus,
+              score_a,
+              score_b,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", m.id);
+          if (upErr) throw upErr;
 
-    for (const m of matches) {
-      try {
-        const date = new Date(m.kickoff_at).toISOString().slice(0, 10);
-        const candidates = eventsByDate.get(date) ?? [];
+          // Sincronizar goles (eventos)
+          let goalsCount = 0;
+          const goals = Array.isArray(data.goals) ? data.goals : [];
+          if (goals.length > 0) {
+            // Borrar eventos previos del partido y reinsertar (idempotente)
+            await admin.from("match_events").delete().eq("match_id", m.id).eq("type", "goal");
 
-        // Buscar el evento donde ambos equipos matcheen
-        const evt = candidates.find((e: any) => {
-          const home = e.strHomeTeam ?? "";
-          const away = e.strAwayTeam ?? "";
-          return (
-            (teamsMatch(home, m.team_a) && teamsMatch(away, m.team_b)) ||
-            (teamsMatch(home, m.team_b) && teamsMatch(away, m.team_a))
-          );
-        });
+            const eventsToInsert = goals.map((g: any) => ({
+              match_id: m.id,
+              type: "goal",
+              minute: g.minute ?? 0,
+              team: g.team?.name ?? "",
+              player: g.scorer?.name ?? null,
+              score_home: g.score?.home ?? null,
+              score_away: g.score?.away ?? null,
+              external_id: g.scorer?.id ? `fd-goal-${fdId}-${g.minute}-${g.scorer.id}` : null,
+            }));
 
-        if (!evt) {
-          results.push({ id: m.id, ok: false, error: `no match found in TheSportsDB for ${m.team_a} vs ${m.team_b} on ${date}` });
-          continue;
-        }
+            if (eventsToInsert.length > 0) {
+              const { error: evErr } = await admin.from("match_events").insert(eventsToInsert);
+              if (!evErr) goalsCount = eventsToInsert.length;
+            }
+          }
 
-        // Determinar si estamos invertidos (away en TSDB = team_a nuestro)
-        const swapped = teamsMatch(evt.strHomeTeam, m.team_b) && teamsMatch(evt.strAwayTeam, m.team_a);
-
-        const homeScoreRaw = evt.intHomeScore;
-        const awayScoreRaw = evt.intAwayScore;
-        const homeScore = homeScoreRaw === null || homeScoreRaw === undefined || homeScoreRaw === "" ? null : Number(homeScoreRaw);
-        const awayScore = awayScoreRaw === null || awayScoreRaw === undefined || awayScoreRaw === "" ? null : Number(awayScoreRaw);
-
-        const score_a = swapped ? awayScore : homeScore;
-        const score_b = swapped ? homeScore : awayScore;
-        const newStatus = mapStatus(evt.strStatus);
-
-        const { error: upErr } = await admin
-          .from("matches")
-          .update({
+          results.push({
+            id: m.id,
+            ok: true,
             status: newStatus,
-            score_a,
-            score_b,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", m.id);
-        if (upErr) throw upErr;
-
-        results.push({
-          id: m.id,
-          ok: true,
-          status: newStatus,
-          score: `${score_a ?? 0}-${score_b ?? 0}`,
-          matched: `${evt.strHomeTeam} vs ${evt.strAwayTeam} (${evt.idEvent})`,
-        });
+            score: `${score_a ?? 0}-${score_b ?? 0}`,
+            goals: goalsCount,
+          });
+        }
       } catch (e) {
         results.push({ id: m.id, ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+
+      // Esperar antes de la siguiente llamada (excepto la última)
+      if (i < matches.length - 1 && DELAY_MS > 0) {
+        await new Promise((res) => setTimeout(res, DELAY_MS));
       }
     }
 
@@ -195,7 +170,7 @@ Deno.serve(async (req) => {
     await finishLog({
       status: errCount === 0 ? "success" : okCount === 0 ? "error" : "partial",
       updated_count: okCount,
-      details: { results, provider: "thesportsdb" },
+      details: { results, provider: "football-data" },
       error_message: errCount > 0 ? `${errCount} partidos no se pudieron sincronizar` : null,
     });
 
