@@ -224,7 +224,10 @@ export default function Predictions() {
         grouped.map(([date, dayMatches]) => (
           <section key={date} className="space-y-3">
             <h2 className="text-lg font-semibold capitalize text-muted-foreground">
-              {format(new Date(date), "EEEE d 'de' MMMM yyyy", { locale: es })}
+              {(() => {
+                const [y, mo, d] = date.split("-").map(Number);
+                return format(new Date(y, mo - 1, d, 12), "EEEE d 'de' MMMM yyyy", { locale: es });
+              })()}
             </h2>
             <div className="grid gap-3 md:grid-cols-2">
               {dayMatches.map((m) => {
