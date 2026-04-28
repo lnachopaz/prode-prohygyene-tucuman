@@ -1,60 +1,90 @@
-# Cargar fixture oficial del Mundial 2026 desde FIFA.com
+# Goles y tarjetas en vivo
 
-## Problema actual
+Hoy el Live ya trae **marcador y estado** desde Football-Data.org, pero no muestra los **eventos del partido** (quién metió el gol, en qué minuto, tarjetas amarillas/rojas). Vamos a sumarlo.
 
-La tabla `matches` tiene partidos duplicados (ej. México-Sudáfrica aparece 2 veces) porque la edge function `sync-matches` se alimenta de **TheSportsDB**, que devuelve datos incompletos/inconsistentes y sin `external_id` estable, además de mezclar nombres de equipos en distintos idiomas.
+## Qué vas a ver en Live
 
-## Solución
+Debajo del marcador, una **timeline cronológica** del partido:
 
-Reemplazar la fuente de datos por el **fixture oficial de FIFA.com** que ya verifiqué (página `scores-fixtures` del Mundial 2026). Los datos son completos: 48 equipos, 12 grupos (A–L), 72 partidos de fase de grupos + eliminatorias, con sede, fecha y hora local del estadio.
+```text
+ 90' 🟨 Casemiro (MUN)
+ 78' ⚽ Mbeumo (BRE)        2 - 1
+ 65' 🟥 Højlund (MUN)
+ 42' ⚽ Rashford (MUN)      2 - 0
+ 18' ⚽ Fernandes (MUN)     1 - 0
+```
 
-## Pasos
+- ⚽ Goles con jugador, minuto y marcador resultante
+- 🟨 Amarillas / 🟥 Rojas con jugador y minuto
+- Se actualiza junto al marcador (cada 30s mientras estás mirando)
+- Si el partido todavía no arrancó: no se muestra la sección
+- Si arrancó pero no hay eventos: "Sin eventos todavía"
 
-### 1. Generar el dataset definitivo (script local, una sola vez)
+## Cómo se va a hacer (técnico)
 
-- Parsear el markdown de la página de FIFA que ya tengo descargado (1753 líneas, contiene los 104 partidos del torneo).
-- Extraer por cada partido: `team_a`, `team_b`, `group_name`, `stage` ("Primera fase", "Octavos", "Cuartos", "Semifinales", "Final"), estadio, fecha local y hora local.
-- Mapear cada **estadio → zona horaria** para convertir la hora local correctamente a UTC en `kickoff_at`. Mapa de sedes:
-  ```
-  Ciudad de México, Guadalajara, Monterrey  → America/Mexico_City
-  Toronto                                   → America/Toronto
-  Vancouver                                 → America/Vancouver
-  Atlanta, Boston, Filadelfia, NY/NJ, Miami → America/New_York
-  Dallas, Houston, Kansas City, Monterrey   → America/Chicago (Dallas/Houston/KC) / Monterrey ya MX
-  Seattle, Los Ángeles, Bahía de SF         → America/Los_Angeles
-  ```
-- Asignar `external_id = "fifa-<idMatch>"` (el ID que aparece en cada URL `/match/17/285023/289273/<idMatch>`) para evitar duplicados futuros.
-- Generar un único archivo TS en el repo con todas las filas tipadas.
+### 1. Nueva tabla `match_events`
 
-### 2. Limpiar y recargar la base de datos
+Guarda los eventos para no depender de la API en cada refresh y poder mostrar histórico.
 
-- Migración SQL: `DELETE FROM matches;` (esto también elimina pronósticos huérfanos vía cascada lógica — confirmar si conservar pronósticos de usuarios ya cargados; ver "Cuestión abierta" abajo).
-- Insertar las ~104 filas del fixture oficial usando la herramienta de inserción.
-- Mantener el campo `team_a_flag`/`team_b_flag` en `null` — el frontend ya resuelve la bandera con `getCountryFlagUrl()` por nombre del país (lib `countryFlags.ts`). Asegurar que **todos** los nombres usados (ej. "RI de Irán", "Islas de Cabo Verde", "RD Congo", "República de Corea", "EE. UU.", "Bosnia y Herzegovina", "Curazao") estén en el diccionario.
+```text
+match_events
+├─ id (uuid)
+├─ match_id (uuid → matches.id)
+├─ minute (int)              -- minuto del partido
+├─ type (text)               -- 'goal' | 'yellow_card' | 'red_card' | 'substitution'
+├─ team (text)               -- 'home' | 'away'
+├─ player (text)             -- nombre del jugador
+├─ score_home (int, null)    -- marcador después del evento (solo goles)
+├─ score_away (int, null)
+├─ external_id (text unique) -- id del evento en Football-Data, evita duplicados
+└─ created_at
+```
 
-### 3. Deshabilitar el sync automático con TheSportsDB
+- RLS: SELECT abierto a usuarios aprobados, INSERT/UPDATE solo service_role (la edge function).
+- Índice en `(match_id, minute)`.
 
-- Quitar el botón "Sincronizar fixture" del panel admin (o renombrarlo a "Recargar fixture oficial" apuntando a una nueva edge function que reinserte el dataset estático).
-- Marcar la edge function `sync-matches` como obsoleta o reemplazar su contenido por un seed del dataset estático (más confiable que scraping en runtime, ya que FIFA no expone API pública).
+### 2. Edge Function `sync-live-matches` (extender la existente)
 
-### 4. Frontend
+Football-Data v4 devuelve en `/matches/{id}` los arrays:
+- `goals[]` → `{ minute, scorer.name, team.name, score.home, score.away }`
+- `bookings[]` → `{ minute, player.name, card: 'YELLOW' | 'RED', team.name }`
 
-- No requiere cambios en `Predictions.tsx`.
-- Ampliar `src/lib/countryFlags.ts` con cualquier nombre faltante detectado en el parseo.
+La función va a:
+1. Traer el partido como ya hace.
+2. Mapear `goals` y `bookings` a filas de `match_events` con `external_id` único (ej: `fd-538122-goal-42-Rashford`).
+3. Hacer `upsert` con `onConflict: 'external_id'` → idempotente, no duplica.
+4. Devolver el conteo de eventos sincronizados además de los marcadores.
 
-## Detalles técnicos
+### 3. Frontend: nuevo componente `MatchTimeline`
 
-- **Archivo nuevo**: `src/data/worldCup2026Fixture.ts` — array tipado con los partidos (single source of truth).
-- **Edge function reescrita**: `supabase/functions/sync-matches/index.ts` → en vez de fetchear TheSportsDB, hace `upsert` del dataset estático con `onConflict: "external_id"`. Idempotente y rápido.
-- **Migración**: limpieza de `matches` + inserción inicial (o dejar que el admin pulse "Recargar fixture" tras desplegar).
-- **Zonas horarias**: usar `date-fns-tz` (ya disponible vía `date-fns`) o cálculo manual por offset fijo de junio/julio 2026 (todas las sedes están en horario de verano en esas fechas, offsets estables).
+En `src/pages/Live.tsx`, debajo del marcador y antes de "Pronósticos del grupo":
 
-## Cuestión abierta
+- Query `match-events` filtrada por `matchId`, `refetchInterval: 30_000`.
+- Render ordenado por `minute` descendente (lo más reciente arriba).
+- Iconos: `Goal` de lucide para ⚽, `Square` amarillo/rojo para tarjetas.
+- Solo se muestra si `started === true`.
 
-Si algún usuario ya cargó pronósticos sobre los partidos duplicados/erróneos actuales, al borrar `matches` se perderán esos pronósticos. Como el torneo aún no empezó y los datos actuales están mal, lo razonable es **borrar todo y empezar limpio**, pero confirmá si preferís preservar pronósticos intentando hacer match por nombres de equipos antes de borrar.
+### 4. Realtime (opcional pero copado)
 
-## Resultado esperado
+Habilitar realtime sobre `match_events` para que los goles aparezcan **al instante** en todos los dispositivos abiertos, sin esperar al próximo polling de 30s:
 
-- 104 partidos correctos, sin duplicados, con horarios UTC precisos.
-- Banderas de país estándar ya funcionando vía el helper existente.
-- Fixture deja de depender de una API externa inestable.
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE public.match_events;
+```
+
+Y en `Live.tsx` un `supabase.channel('match-events').on('postgres_changes', ...)` que invalide la query cuando llega un INSERT.
+
+## Limitaciones honestas
+
+- **Football-Data plan free** (10 req/min): el detalle de eventos solo viene en `/matches/{id}`, ya lo estamos pidiendo. Ok.
+- **Latencia**: Football-Data suele tener los goles cargados ~30-90s después del evento real. No es ESPN, pero es lo mejor gratis.
+- **Tarjetas**: a veces vienen unos minutos tarde o sin nombre del jugador completo. Lo manejo con fallbacks.
+- Solo funciona para partidos con `external_id` que empieza con `fd-` (los del Mundial, una vez los vinculemos).
+
+## Pasos de implementación
+
+1. Migración: crear tabla `match_events` + RLS + índice + agregar a `supabase_realtime`.
+2. Actualizar edge function `sync-live-matches` para extraer y upsertear eventos.
+3. Crear componente `MatchTimeline.tsx`.
+4. Integrarlo en `Live.tsx` + suscripción realtime.
+5. Probar con el partido de prueba (Manchester United vs Brentford si todavía está vinculado, o lo re-vinculamos a un partido en curso).

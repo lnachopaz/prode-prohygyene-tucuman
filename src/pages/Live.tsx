@@ -7,6 +7,7 @@ import { Loader2, Radio, Clock, Trophy, RefreshCw } from "lucide-react";
 import { format, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { Countdown } from "@/components/Countdown";
+import { MatchTimeline } from "@/components/MatchTimeline";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -176,6 +177,11 @@ export default function Live() {
           )}
         </CardContent>
       </Card>
+
+      {/* Timeline de eventos en vivo */}
+      {started && (
+        <MatchTimeline matchId={m.id} teamA={m.team_a} teamB={m.team_b} />
+      )}
 
       {/* Pronósticos */}
       <Card>
