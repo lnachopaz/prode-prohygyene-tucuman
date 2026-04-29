@@ -197,6 +197,9 @@ function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }
             <Button size="sm" variant="outline" onClick={recalc} disabled={recalcBusy} title="Recalcular puntos">
               {recalcBusy ? <Loader2 className="h-4 w-4" /> : <Calculator className="h-4 w-4" />}
             </Button>
+            <Button size="sm" variant="ghost" onClick={restoreDefaults} title="Restaurar a configuración predeterminada">
+              <RotateCcw className="h-4 w-4" />
+            </Button>
             <Button size="sm" variant="ghost" onClick={remove} title="Eliminar">
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
