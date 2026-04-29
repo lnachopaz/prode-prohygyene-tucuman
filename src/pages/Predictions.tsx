@@ -284,10 +284,12 @@ export default function Predictions() {
 
 function MatchCard({
   match,
+  window: predWindow,
   prediction,
   onSaved,
 }: {
   match: Match;
+  window?: PredictionWindow;
   prediction?: Prediction;
   onSaved: () => void;
 }) {
@@ -302,7 +304,17 @@ function MatchCard({
   const timeLocked = !isAfter(lockAt, now) || match.status !== "scheduled";
   const lockedByAdmin = lockMode === "force_closed";
   const forcedOpen = lockMode === "force_open" && match.status === "scheduled";
-  const locked = lockedByAdmin || (!forcedOpen && timeLocked);
+
+  // Estado de la ventana de carga (fecha del torneo)
+  const windowOpen = !predWindow
+    ? true
+    : now >= new Date(predWindow.opens_at) && now <= new Date(predWindow.closes_at);
+  const windowNotYetOpen = predWindow ? now < new Date(predWindow.opens_at) : false;
+  const windowClosed = predWindow ? now > new Date(predWindow.closes_at) : false;
+
+  const locked =
+    lockedByAdmin ||
+    (!forcedOpen && (timeLocked || !windowOpen));
 
   const [a, setA] = useState<string>(prediction?.pred_a?.toString() ?? "");
   const [b, setB] = useState<string>(prediction?.pred_b?.toString() ?? "");
