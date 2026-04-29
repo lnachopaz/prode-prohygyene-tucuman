@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllPaginated } from "@/lib/fetchAll";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +26,16 @@ type PredRow = {
 
 type Profile = { id: string; display_name: string; avatar_url: string | null };
 
+type LeaderboardRow = {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  total_points: number;
+  exact_hits: number;
+  result_hits: number;
+  predictions_count: number;
+};
+
 type StageKey = "all" | "groups" | "r16" | "qf" | "sf" | "final";
 
 const STAGE_LABEL: Record<StageKey, string> = {
@@ -38,11 +49,11 @@ const STAGE_LABEL: Record<StageKey, string> = {
 
 function stageKey(stage: string): StageKey {
   const s = stage.toLowerCase();
-  if (s.includes("grupo")) return "groups";
-  if (s.includes("octavo") || s.includes("last 16") || s.includes("last 32")) return "r16";
-  if (s.includes("cuarto")) return "qf";
+  if (s.includes("grupo") || s.includes("group")) return "groups";
+  if (s.includes("octavo") || s.includes("last 16") || s.includes("last 32") || s.includes("round of 16")) return "r16";
+  if (s.includes("cuarto") || s.includes("quarter")) return "qf";
   if (s.includes("semi")) return "sf";
-  if (s.includes("final") || s.includes("tercer")) return "final";
+  if (s.includes("final") || s.includes("tercer") || s.includes("third")) return "final";
   return "all";
 }
 
@@ -77,7 +88,6 @@ function aggregate(rows: PredRow[], profiles: Profile[], filter: StageKey): Agg[
       if (r.points === 3) ex++;
       else if (r.points === 1) res++;
     }
-    // streak: consecutive most-recent finished matches with points > 0
     const sorted = [...finished].sort(
       (a, b) => new Date(b.match!.kickoff_at).getTime() - new Date(a.match!.kickoff_at).getTime(),
     );
@@ -105,14 +115,31 @@ export default function Ranking() {
   const { user } = useAuth();
   const [filter, setFilter] = useState<StageKey>("all");
 
-  const { data: preds, isLoading: l1 } = useQuery({
-    queryKey: ["ranking-preds"],
+  // Server-side leaderboard (1 row per user, no row limit issue) → used for "all" mode
+  const { data: leaderboard, isLoading: lLb } = useQuery({
+    queryKey: ["ranking-leaderboard"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("predictions")
-        .select("user_id, pred_a, pred_b, points, match:matches(id, stage, status, score_a, score_b, kickoff_at)");
+        .from("leaderboard")
+        .select("*")
+        .order("total_points", { ascending: false })
+        .order("exact_hits", { ascending: false });
       if (error) throw error;
-      return data as unknown as PredRow[];
+      return (data ?? []) as LeaderboardRow[];
+    },
+  });
+
+  // ALL predictions, paginated — used for stage filters, streak, best-by-stage, and ↑/↓ deltas
+  const { data: preds, isLoading: l1 } = useQuery({
+    queryKey: ["ranking-preds-all"],
+    queryFn: async () => {
+      const rows = await fetchAllPaginated<PredRow>(() =>
+        supabase
+          .from("predictions")
+          .select("user_id, pred_a, pred_b, points, match:matches(id, stage, status, score_a, score_b, kickoff_at)")
+          .order("user_id", { ascending: true }),
+      );
+      return rows;
     },
   });
 
@@ -125,15 +152,54 @@ export default function Ranking() {
     },
   });
 
+  // Streak per user (always computed across all stages)
+  const streakByUser = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!preds) return map;
+    const grouped = new Map<string, PredRow[]>();
+    for (const r of preds) {
+      if (!r.match) continue;
+      const finished = r.match.status === "finished" || (r.match.score_a != null && r.match.score_b != null);
+      if (!finished) continue;
+      if (!grouped.has(r.user_id)) grouped.set(r.user_id, []);
+      grouped.get(r.user_id)!.push(r);
+    }
+    for (const [uid, list] of grouped) {
+      const sorted = list.sort(
+        (a, b) => new Date(b.match!.kickoff_at).getTime() - new Date(a.match!.kickoff_at).getTime(),
+      );
+      let s = 0;
+      for (const r of sorted) {
+        if ((r.points || 0) > 0) s++;
+        else break;
+      }
+      map.set(uid, s);
+    }
+    return map;
+  }, [preds]);
+
   // Current ranking with filter
-  const current = useMemo(() => {
+  const current = useMemo<Agg[]>(() => {
+    if (filter === "all") {
+      if (!leaderboard) return [];
+      return leaderboard.map((r) => ({
+        user_id: r.user_id,
+        display_name: r.display_name,
+        total_points: r.total_points || 0,
+        exact_hits: r.exact_hits || 0,
+        result_hits: r.result_hits || 0,
+        predictions_count: r.predictions_count || 0,
+        finished_count: 0, // not used in render
+        streak: streakByUser.get(r.user_id) ?? 0,
+      }));
+    }
     if (!preds || !profiles) return [];
     return aggregate(preds, profiles, filter);
-  }, [preds, profiles, filter]);
+  }, [filter, leaderboard, preds, profiles, streakByUser]);
 
   // Previous ranking (excluding the most recent finished matchday) — only "all" mode
   const previous = useMemo(() => {
-    if (!preds || !profiles) return new Map<string, number>();
+    if (filter !== "all" || !preds || !profiles) return new Map<string, number>();
     const finishedKickoffs = preds
       .map((r) => r.match)
       .filter((m): m is NonNullable<PredRow["match"]> => !!m && (m.status === "finished" || (m.score_a != null && m.score_b != null)))
@@ -146,9 +212,9 @@ export default function Ranking() {
     const map = new Map<string, number>();
     prev.forEach((p, i) => map.set(p.user_id, i + 1));
     return map;
-  }, [preds, profiles]);
+  }, [filter, preds, profiles]);
 
-  // Best per stage (always computed across all stages)
+  // Best per stage
   const bestByStage = useMemo(() => {
     if (!preds || !profiles) return {} as Record<StageKey, Agg | undefined>;
     const out: Record<string, Agg | undefined> = {};
@@ -159,7 +225,7 @@ export default function Ranking() {
     return out as Record<StageKey, Agg | undefined>;
   }, [preds, profiles]);
 
-  if (l1 || l2) {
+  if (lLb || l1 || l2) {
     return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
 
