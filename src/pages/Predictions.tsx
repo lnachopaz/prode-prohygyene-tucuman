@@ -352,6 +352,10 @@ function MatchCard({
     if (match.status === "finished") return <Badge variant="secondary">Finalizado</Badge>;
     if (lockedByAdmin) return <Badge variant="destructive" className="gap-1"><Lock className="h-3 w-3" /> Bloqueado por admin</Badge>;
     if (forcedOpen && timeLocked) return <Badge className="gap-1 bg-green-600 hover:bg-green-600">Reabierto por admin</Badge>;
+    if (windowNotYetOpen && predWindow)
+      return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Abre {formatAR(predWindow.opens_at, "dd/MM HH:mm")}</Badge>;
+    if (windowClosed && predWindow)
+      return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Ventana cerrada</Badge>;
     if (locked) return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Cerrado</Badge>;
     return <Badge variant="outline">{formatAR(match.kickoff_at, "HH:mm 'hs'")}</Badge>;
   };
