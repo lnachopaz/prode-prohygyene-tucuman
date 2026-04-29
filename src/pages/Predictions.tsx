@@ -35,6 +35,7 @@ type Match = {
   score_b: number | null;
   predictions_lock_mode?: "auto" | "force_open" | "force_closed";
   prediction_window_id: string | null;
+  venue?: string | null;
 };
 
 type PredictionWindow = {
