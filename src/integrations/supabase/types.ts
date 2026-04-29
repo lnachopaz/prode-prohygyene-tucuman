@@ -325,6 +325,18 @@ export type Database = {
         Args: { pa: number; pb: number; sa: number; sb: number }
         Returns: number
       }
+      calc_points_match: {
+        Args: {
+          pa: number
+          pb: number
+          sa: number
+          sb: number
+          stage: string
+          team_a: string
+          team_b: string
+        }
+        Returns: number
+      }
       delete_user_completely: { Args: { _user_id: string }; Returns: undefined }
       has_role: {
         Args: {

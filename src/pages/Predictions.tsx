@@ -13,13 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save, Lock, X, Pencil } from "lucide-react";
+import { Loader2, Save, Lock, X, Pencil, Sparkles } from "lucide-react";
 import { MatchDetailsDialog } from "@/components/MatchDetailsDialog";
 import { toast } from "sonner";
 import { format, isAfter, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
 import { formatAR } from "@/lib/datetime";
+import { getMultiplierInfo } from "@/lib/scoring";
 
 type Match = {
   id: string;
@@ -362,15 +363,29 @@ function MatchCard({
     return <Badge variant="outline">{formatAR(match.kickoff_at, "HH:mm 'hs'")}</Badge>;
   };
 
+  const multInfo = getMultiplierInfo(match.team_a, match.team_b, match.stage);
+
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-4 space-y-3">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className="font-medium">
+        <div className="flex items-center justify-between text-xs text-muted-foreground gap-2">
+          <span className="font-medium truncate">
             {match.stage}
             {match.group_name ? ` · ${match.group_name}` : ""}
           </span>
-          {statusBadge()}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {multInfo && (
+              <Badge
+                variant="default"
+                className="gap-1 bg-amber-500 hover:bg-amber-500 text-white"
+                title={`Multiplicador: ${multInfo.reasons.join(" + ")}`}
+              >
+                <Sparkles className="h-3 w-3" />
+                {multInfo.label}
+              </Badge>
+            )}
+            {statusBadge()}
+          </div>
         </div>
 
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
