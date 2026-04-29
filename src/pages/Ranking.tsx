@@ -118,6 +118,8 @@ export default function Ranking() {
   // Server-side leaderboard (1 row per user, no row limit issue) → used for "all" mode
   const { data: leaderboard, isLoading: lLb } = useQuery({
     queryKey: ["ranking-leaderboard"],
+    refetchOnMount: "always",
+    staleTime: 0,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("leaderboard")
@@ -132,6 +134,8 @@ export default function Ranking() {
   // ALL predictions, paginated — used for stage filters, streak, best-by-stage, and ↑/↓ deltas
   const { data: preds, isLoading: l1 } = useQuery({
     queryKey: ["ranking-preds-all"],
+    refetchOnMount: "always",
+    staleTime: 0,
     queryFn: async () => {
       const rows = await fetchAllPaginated<PredRow>(() =>
         supabase
@@ -144,6 +148,8 @@ export default function Ranking() {
   });
 
   const { data: profiles, isLoading: l2 } = useQuery({
+    refetchOnMount: "always",
+    staleTime: 0,
     queryKey: ["ranking-profiles"],
     queryFn: async () => {
       const { data, error } = await supabase.from("profiles").select("id, display_name, avatar_url");
