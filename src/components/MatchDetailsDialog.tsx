@@ -32,7 +32,7 @@ type MatchDetails = {
   stage: string;
   group_name: string | null;
   kickoff_at: string;
-  venue: string | null;
+  venue?: string | null;
 };
 
 type PredRow = {
