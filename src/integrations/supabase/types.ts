@@ -89,6 +89,7 @@ export type Database = {
           group_name: string | null
           id: string
           kickoff_at: string
+          prediction_window_id: string | null
           predictions_lock_mode: Database["public"]["Enums"]["lock_mode"]
           score_a: number | null
           score_b: number | null
@@ -109,6 +110,7 @@ export type Database = {
           group_name?: string | null
           id?: string
           kickoff_at: string
+          prediction_window_id?: string | null
           predictions_lock_mode?: Database["public"]["Enums"]["lock_mode"]
           score_a?: number | null
           score_b?: number | null
@@ -129,6 +131,7 @@ export type Database = {
           group_name?: string | null
           id?: string
           kickoff_at?: string
+          prediction_window_id?: string | null
           predictions_lock_mode?: Database["public"]["Enums"]["lock_mode"]
           score_a?: number | null
           score_b?: number | null
@@ -142,6 +145,41 @@ export type Database = {
           updated_at?: string
           venue?: string | null
           venue_tz?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matches_prediction_window_id_fkey"
+            columns: ["prediction_window_id"]
+            isOneToOne: false
+            referencedRelation: "prediction_windows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prediction_windows: {
+        Row: {
+          closes_at: string
+          created_at: string
+          id: string
+          label: string
+          opens_at: string
+          sort_order: number
+        }
+        Insert: {
+          closes_at: string
+          created_at?: string
+          id: string
+          label: string
+          opens_at: string
+          sort_order: number
+        }
+        Update: {
+          closes_at?: string
+          created_at?: string
+          id?: string
+          label?: string
+          opens_at?: string
+          sort_order?: number
         }
         Relationships: []
       }
