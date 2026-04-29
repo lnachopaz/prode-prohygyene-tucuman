@@ -8,6 +8,12 @@ import { Loader2, Radio, Clock, Trophy, RefreshCw } from "lucide-react";
 import { format, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { Countdown } from "@/components/Countdown";
+import {
+  useLiveMatches,
+  LIVE_INTERVAL_MS,
+  IDLE_INTERVAL_MS,
+  MATCHES_STALE_TIME_MS,
+} from "@/hooks/useLiveMatches";
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -29,7 +35,7 @@ export default function Live() {
     try {
       const { data, error } = await supabase.functions.invoke("sync-live-matches");
       if (error) throw error;
-      await queryClient.invalidateQueries({ queryKey: ["live-match"] });
+      await queryClient.invalidateQueries({ queryKey: ["matches", "live-feed"] });
       if (!silent) toast.success(`Marcadores actualizados (${data?.updated ?? 0})`);
     } catch (e: any) {
       if (!silent) toast.error("Error sincronizando: " + (e?.message ?? "desconocido"));
@@ -49,40 +55,24 @@ export default function Live() {
   const [selectedIdx, setSelectedIdx] = useState(0);
 
   // Partidos en vivo (puede haber varios simultáneos) + fallback al próximo
-  const { data: liveData, isLoading } = useQuery({
-    queryKey: ["live-match"],
-    refetchInterval: 30_000,
-    queryFn: async () => {
-      const nowIso = new Date().toISOString();
+  // Lista completa de matches con smart polling (solo desde Supabase).
+  const { data: allMatches, isLoading } = useLiveMatches();
 
-      // 1) Todos los partidos marcados como live
-      const { data: lives } = await supabase
-        .from("matches")
-        .select("*")
-        .eq("status", "live")
-        .order("kickoff_at");
-      if (lives && lives.length > 0) return { matches: lives, isLive: true };
-
-      // 2) Partidos cuyo kickoff ya pasó pero aún no están finished
-      const { data: ongoing } = await supabase
-        .from("matches")
-        .select("*")
-        .lte("kickoff_at", nowIso)
-        .neq("status", "finished")
-        .order("kickoff_at", { ascending: false });
-      if (ongoing && ongoing.length > 0) return { matches: ongoing, isLive: true };
-
-      // 3) Próximo partido programado
-      const { data: next } = await supabase
-        .from("matches")
-        .select("*")
-        .gt("kickoff_at", nowIso)
-        .order("kickoff_at")
-        .limit(1)
-        .maybeSingle();
-      return next ? { matches: [next], isLive: false } : null;
-    },
-  });
+  // Derivamos partidos en vivo / próximo desde el cache local — sin más fetches.
+  const liveData = (() => {
+    if (!allMatches) return null;
+    const now = new Date();
+    const lives = allMatches.filter((m) => m.status === "live");
+    if (lives.length > 0) return { matches: lives, isLive: true };
+    const ongoing = allMatches.filter(
+      (m) => new Date(m.kickoff_at) <= now && m.status !== "finished",
+    );
+    if (ongoing.length > 0) return { matches: ongoing, isLive: true };
+    const next = allMatches.find(
+      (m) => new Date(m.kickoff_at) > now && m.status === "scheduled",
+    );
+    return next ? { matches: [next], isLive: false } : null;
+  })();
 
   const matches = liveData?.matches ?? [];
   const safeIdx = Math.min(selectedIdx, Math.max(0, matches.length - 1));
@@ -92,10 +82,15 @@ export default function Live() {
   const started = liveMatch ? (liveMatch.isLive || new Date(liveMatch.match.kickoff_at) <= new Date()) : false;
   const predsLocked = liveMatch ? subHours(new Date(liveMatch.match.kickoff_at), 1) <= new Date() : false;
 
+  const isLiveNow = !!liveMatch?.isLive;
+  const secondaryInterval = isLiveNow ? LIVE_INTERVAL_MS : IDLE_INTERVAL_MS;
+
   const { data: predictions } = useQuery({
     queryKey: ["live-predictions", matchId, predsLocked],
     enabled: !!matchId && predsLocked,
-    refetchInterval: 30_000,
+    staleTime: MATCHES_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+    refetchInterval: secondaryInterval,
     queryFn: async () => {
       const { data: preds } = await supabase
         .from("predictions")
@@ -118,7 +113,9 @@ export default function Live() {
   const { data: myPred } = useQuery({
     queryKey: ["live-my-pred", matchId, user?.id],
     enabled: !!matchId && !!user,
-    refetchInterval: 30_000,
+    staleTime: MATCHES_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+    refetchInterval: secondaryInterval,
     queryFn: async () => {
       const { data } = await supabase
         .from("predictions")
