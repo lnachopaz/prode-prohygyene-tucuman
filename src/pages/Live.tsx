@@ -35,7 +35,7 @@ export default function Live() {
     try {
       const { data, error } = await supabase.functions.invoke("sync-live-matches");
       if (error) throw error;
-      await queryClient.invalidateQueries({ queryKey: ["live-match"] });
+      await queryClient.invalidateQueries({ queryKey: ["matches", "live-feed"] });
       if (!silent) toast.success(`Marcadores actualizados (${data?.updated ?? 0})`);
     } catch (e: any) {
       if (!silent) toast.error("Error sincronizando: " + (e?.message ?? "desconocido"));
