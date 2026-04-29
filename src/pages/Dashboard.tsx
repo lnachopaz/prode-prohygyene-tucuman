@@ -223,6 +223,8 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      <TournamentRules />
     </div>
   );
 }
