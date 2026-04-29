@@ -137,6 +137,23 @@ function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }
     onChange();
   }
 
+  async function restoreDefaults() {
+    if (!confirm("¿Restaurar este partido a configuración predeterminada?\n\n• Pronóstico: Automático\n• Marcador: -  -\n• Estado: Programado")) return;
+    setBusy(true);
+    const { error } = await supabase.from("matches").update({
+      predictions_lock_mode: "auto",
+      score_a: null,
+      score_b: null,
+      status: "scheduled",
+      test_mode: false,
+    }).eq("id", match.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    setSa(""); setSb(""); setStatus("scheduled");
+    toast.success("↩️ Partido restaurado a configuración predeterminada");
+    onChange();
+  }
+
   async function changeLockMode(mode: "auto" | "force_open" | "force_closed") {
     setLockBusy(true);
     const { error } = await supabase.from("matches").update({ predictions_lock_mode: mode }).eq("id", match.id);
