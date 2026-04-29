@@ -123,6 +123,29 @@ export default function Profile() {
           </Button>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileDown className="h-5 w-5" /> Backup de mis pronósticos
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Descargá una copia de todos tus pronósticos con el resultado real y los puntos obtenidos.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => handleExport("csv")} disabled={exporting !== null}>
+              {exporting === "csv" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+              Descargar CSV
+            </Button>
+            <Button variant="outline" onClick={() => handleExport("pdf")} disabled={exporting !== null}>
+              {exporting === "pdf" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+              Descargar PDF
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
