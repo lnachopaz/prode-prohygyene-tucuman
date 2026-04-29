@@ -1035,7 +1035,7 @@ export function BulkSimulator() {
         if (side === "a") m.score_a = newA; else m.score_b = newB;
         await new Promise((r) => setTimeout(r, 3000));
       }
-      toast.success("🎉 Goleada terminada — andá a /live a verla");
+      toast.success("🎉 Goleada terminada");
       refresh();
     } finally { setBusy(null); }
   }
@@ -1091,7 +1091,7 @@ export function BulkSimulator() {
               <Zap className="h-5 w-5 mr-3" />
               <div className="text-left">
                 <div className="font-semibold">Goleada en vivo (30s)</div>
-                <div className="text-xs opacity-80 font-normal">Sumá goles cada 3s · andá a /live a mirar</div>
+                <div className="text-xs opacity-80 font-normal">Sumá goles cada 3s</div>
               </div>
               {busy === "rain" && <Loader2 className="h-4 w-4 ml-auto animate-spin" />}
             </Button>
@@ -1114,7 +1114,7 @@ export function BulkSimulator() {
             <li>Abrí <a href="/ranking" target="_blank" rel="noreferrer" className="text-primary underline">/ranking</a> en otra pestaña → debería liderar <strong>Test User 092</strong> o similar con ~28 pts.</li>
             <li>Apretá <strong>"Avanzar 5 partidos"</strong> y volvé a /ranking → vas a ver el orden cambiando.</li>
             <li>Andá a <a href="/" target="_blank" rel="noreferrer" className="text-primary underline">/ (Resumen)</a> → el Top 5 debe coincidir EXACTO con el ranking.</li>
-            <li>Apretá <strong>"Poner 3 partidos en vivo"</strong> + <strong>"Goleada en vivo"</strong>, abrí <a href="/live" target="_blank" rel="noreferrer" className="text-primary underline">/live</a> y mirá los marcadores y puntos parciales.</li>
+            <li>Apretá <strong>"Poner 3 partidos en vivo"</strong> + <strong>"Goleada en vivo"</strong> y mirá los marcadores actualizarse.</li>
             <li>Tab <strong>"Pronósticos"</strong> → elegí "Test User 092" y verificá que ves sus 104 pronósticos con puntos.</li>
             <li>Cuando termines de probar, apretá <strong>"Reset total prueba"</strong> para dejar los partidos limpios.</li>
           </ol>
