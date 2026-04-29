@@ -137,6 +137,23 @@ function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }
     onChange();
   }
 
+  async function restoreDefaults() {
+    if (!confirm("¿Restaurar este partido a configuración predeterminada?\n\n• Pronóstico: Automático\n• Marcador: -  -\n• Estado: Programado")) return;
+    setBusy(true);
+    const { error } = await supabase.from("matches").update({
+      predictions_lock_mode: "auto",
+      score_a: null,
+      score_b: null,
+      status: "scheduled",
+      test_mode: false,
+    }).eq("id", match.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    setSa(""); setSb(""); setStatus("scheduled");
+    toast.success("↩️ Partido restaurado a configuración predeterminada");
+    onChange();
+  }
+
   async function changeLockMode(mode: "auto" | "force_open" | "force_closed") {
     setLockBusy(true);
     const { error } = await supabase.from("matches").update({ predictions_lock_mode: mode }).eq("id", match.id);
@@ -179,6 +196,9 @@ function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }
             </Button>
             <Button size="sm" variant="outline" onClick={recalc} disabled={recalcBusy} title="Recalcular puntos">
               {recalcBusy ? <Loader2 className="h-4 w-4" /> : <Calculator className="h-4 w-4" />}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={restoreDefaults} title="Restaurar a configuración predeterminada">
+              <RotateCcw className="h-4 w-4" />
             </Button>
             <Button size="sm" variant="ghost" onClick={remove} title="Eliminar">
               <Trash2 className="h-4 w-4 text-destructive" />
@@ -716,246 +736,9 @@ function ExportRanking() {
 // MODO PRUEBA: simulador rápido para validar el flujo end-to-end
 // ============================================================
 function TestModeAdmin() {
-  const qc = useQueryClient();
-  const { data: matches, isLoading } = useQuery({
-    queryKey: ["test-matches"],
-    refetchInterval: 5_000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("matches")
-        .select("id, team_a, team_b, status, score_a, score_b, kickoff_at, predictions_lock_mode, test_mode")
-        .order("kickoff_at");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  function refresh() {
-    qc.invalidateQueries({ queryKey: ["test-matches"] });
-    qc.invalidateQueries({ queryKey: ["admin-matches"] });
-    qc.invalidateQueries({ queryKey: ["matches"] });
-    qc.invalidateQueries({ queryKey: ["leaderboard"] });
-  }
-
-  async function enableTestMode(id: string) {
-    const { error } = await supabase.from("matches").update({ test_mode: true }).eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("🧪 Modo prueba activado · el sync automático no tocará este partido");
-    refresh();
-  }
-
-  async function disableTestMode(id: string) {
-    const { error } = await supabase.from("matches").update({ test_mode: false }).eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("✅ Modo prueba desactivado · vuelve al sync automático");
-    refresh();
-  }
-
-  async function setLive(id: string) {
-    // Activamos test_mode al pasar a vivo manualmente para que el sync no lo sobrescriba.
-    const { error } = await supabase.from("matches").update({
-      status: "live", score_a: 0, score_b: 0, test_mode: true,
-    }).eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("⚽ EN VIVO (0-0) · modo prueba activado");
-    refresh();
-  }
-
-  async function addGoal(id: string, side: "a" | "b", current: { score_a: number | null; score_b: number | null }) {
-    const score_a = (current.score_a ?? 0) + (side === "a" ? 1 : 0);
-    const score_b = (current.score_b ?? 0) + (side === "b" ? 1 : 0);
-    const { error } = await supabase.from("matches").update({ score_a, score_b, test_mode: true }).eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success(`Gol ${side === "a" ? "local" : "visitante"} → ${score_a}-${score_b}`);
-    refresh();
-  }
-
-  async function finish(id: string) {
-    const { error } = await supabase.from("matches").update({ status: "finished" }).eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("🏁 Partido finalizado · puntos calculados automáticamente");
-    refresh();
-  }
-
-  async function reset(id: string) {
-    // Al resetear, también desactivamos el modo prueba para que el sync vuelva a tomarlo.
-    const { error } = await supabase.from("matches").update({
-      status: "scheduled", score_a: null, score_b: null, test_mode: false,
-    }).eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("↩️ Reseteado · modo prueba desactivado");
-    refresh();
-  }
-
-  async function simulateTwoLive() {
-    const scheduled = (matches ?? []).filter((m: any) => m.status === "scheduled").slice(0, 2);
-    if (scheduled.length < 2) return toast.error("Necesitás al menos 2 partidos programados");
-    for (const m of scheduled) {
-      await supabase.from("matches").update({ status: "live", score_a: 0, score_b: 0, test_mode: true }).eq("id", m.id);
-    }
-    toast.success("⚽⚽ 2 partidos simultáneos en vivo (modo prueba)");
-    refresh();
-  }
-
-  async function resetAllLive() {
-    const live = (matches ?? []).filter((m: any) => m.status === "live");
-    if (live.length === 0) return toast.error("No hay partidos en vivo");
-    for (const m of live) {
-      await supabase.from("matches").update({ status: "scheduled", score_a: null, score_b: null, test_mode: false }).eq("id", m.id);
-    }
-    toast.success(`↩️ ${live.length} partidos reseteados`);
-    refresh();
-  }
-
-  if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-primary" />;
-
-  const liveMatches = (matches ?? []).filter((m: any) => m.status === "live");
-  const scheduledSoon = (matches ?? []).filter((m: any) => m.status === "scheduled").slice(0, 6);
-  const finished = (matches ?? []).filter((m: any) => m.status === "finished").slice(-3);
-
   return (
     <div className="space-y-6">
       <BulkSimulator />
-      <Card className="border-yellow-500/40 bg-yellow-500/5">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <FlaskConical className="h-4 w-4 text-yellow-600" /> Modo prueba
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p className="text-muted-foreground">
-            Simulá el ciclo completo de un partido sin esperar a que jueguen de verdad. Los cambios afectan datos reales (predicciones, ranking), así que <strong>acordate de resetear</strong> los partidos cuando termines de probar.
-          </p>
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Button size="sm" variant="outline" onClick={simulateTwoLive}>
-              <Play className="h-4 w-4 mr-2" />Simular 2 partidos simultáneos
-            </Button>
-            <Button size="sm" variant="outline" onClick={resetAllLive}>
-              <RotateCcw className="h-4 w-4 mr-2" />Resetear todos los "en vivo"
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* En vivo */}
-      <div>
-        <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-          <span className="inline-block h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-          En vivo ({liveMatches.length})
-        </h3>
-        {liveMatches.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Ningún partido en vivo.</p>
-        ) : (
-          <div className="space-y-2">
-            {liveMatches.map((m: any) => (
-              <Card key={m.id}>
-                <CardContent className="p-3 flex flex-wrap items-center gap-2">
-                  <div className="flex-1 min-w-[200px]">
-                    <div className="font-semibold flex items-center gap-2">
-                      {m.team_a} vs {m.team_b}
-                      {m.test_mode && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 font-medium">🧪 PRUEBA</span>
-                      )}
-                    </div>
-                    <div className="text-2xl font-mono mt-1">{m.score_a ?? 0} - {m.score_b ?? 0}</div>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={() => addGoal(m.id, "a", m)}>
-                    <Goal className="h-4 w-4 mr-1" />Gol {m.team_a}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => addGoal(m.id, "b", m)}>
-                    <Goal className="h-4 w-4 mr-1" />Gol {m.team_b}
-                  </Button>
-                  <Button size="sm" onClick={() => finish(m.id)}>
-                    <Square className="h-4 w-4 mr-1" />Finalizar
-                  </Button>
-                  {m.test_mode ? (
-                    <Button size="sm" variant="outline" onClick={() => disableTestMode(m.id)} title="Desactivar modo prueba (vuelve al sync automático)">
-                      ✅ Salir prueba
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="outline" onClick={() => enableTestMode(m.id)} title="Activar modo prueba (el sync no lo tocará)">
-                      🧪 Activar prueba
-                    </Button>
-                  )}
-                  <Button size="sm" variant="ghost" onClick={() => reset(m.id)}>
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Programados */}
-      <div>
-        <h3 className="text-sm font-semibold mb-2">Próximos programados (primeros 6)</h3>
-        <div className="space-y-2">
-          {scheduledSoon.map((m: any) => (
-            <Card key={m.id}>
-              <CardContent className="p-3 flex flex-wrap items-center gap-2">
-                <div className="flex-1 min-w-[200px]">
-                  <div className="text-xs text-muted-foreground">{formatAR(m.kickoff_at, "dd/MM HH:mm")}</div>
-                  <div className="font-medium flex items-center gap-2">
-                    {m.team_a} vs {m.team_b}
-                    {m.test_mode && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 font-medium">🧪 PRUEBA</span>
-                    )}
-                  </div>
-                </div>
-                {m.test_mode ? (
-                  <Button size="sm" variant="outline" onClick={() => disableTestMode(m.id)}>
-                    ✅ Salir prueba
-                  </Button>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={() => enableTestMode(m.id)}>
-                    🧪 Activar prueba
-                  </Button>
-                )}
-                <Button size="sm" onClick={() => setLive(m.id)}>
-                  <Play className="h-4 w-4 mr-1" />Marcar en vivo
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Finalizados recientes (para resetear) */}
-      {finished.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold mb-2">Finalizados recientes</h3>
-          <div className="space-y-2">
-            {finished.map((m: any) => (
-              <Card key={m.id}>
-                <CardContent className="p-3 flex flex-wrap items-center gap-2">
-                  <div className="flex-1 min-w-[200px]">
-                    <div className="font-medium">{m.team_a} {m.score_a ?? 0} - {m.score_b ?? 0} {m.team_b}</div>
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={() => reset(m.id)}>
-                    <RotateCcw className="h-4 w-4 mr-1" />Resetear
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <Card className="border-blue-500/40 bg-blue-500/5">
-        <CardHeader><CardTitle className="text-base">📋 Checklist sugerido antes de lanzar</CardTitle></CardHeader>
-        <CardContent>
-          <ol className="list-decimal list-inside space-y-1.5 text-sm">
-            <li>Cargá un pronóstico tuyo en algún partido programado.</li>
-            <li>Acá: marcá ese partido como <strong>En vivo</strong> → andá a la pestaña <strong>Live</strong> y verificá que aparece con tu pronóstico parcial.</li>
-            <li>Sumá goles → confirmá que el "Parcial: +X pts" se actualiza.</li>
-            <li>Tocá <strong>Finalizar</strong> → andá al <strong>Ranking</strong> y verificá que sumaron los puntos correctos (3 si exacto, 1 si resultado, 0 si no).</li>
-            <li>Probá <strong>Simular 2 partidos simultáneos</strong> y esperá ~30s → mirá la pestaña Sync &amp; Export para confirmar que la función procesó ambos sin errores.</li>
-            <li>Cambiá el modo de bloqueo de un partido (pestaña Partidos) → confirmá que en <strong>Pronósticos</strong> los inputs se habilitan/deshabilitan según corresponda.</li>
-            <li>Cuando termines, <strong>reseteá todos los partidos</strong> que tocaste para que vuelvan a su estado real.</li>
-          </ol>
-        </CardContent>
-      </Card>
     </div>
   );
 }
