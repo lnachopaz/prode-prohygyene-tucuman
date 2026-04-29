@@ -17,22 +17,31 @@ export default function Dashboard() {
     queryKey: ["dashboard-stats", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const [{ data: lb }, { data: matches }, { data: preds }] = await Promise.all([
-        supabase.from("leaderboard").select("*").eq("user_id", user!.id).maybeSingle(),
+      const [{ data: fullLb }, { data: matches }, { data: preds }] = await Promise.all([
+        supabase
+          .from("leaderboard")
+          .select("user_id, total_points, exact_hits, result_hits")
+          .order("total_points", { ascending: false })
+          .order("exact_hits", { ascending: false }),
         supabase.from("matches").select("id,status,kickoff_at"),
         supabase.from("predictions").select("match_id").eq("user_id", user!.id),
       ]);
       const total = matches?.length ?? 0;
       const finished = matches?.filter((m) => m.status === "finished").length ?? 0;
       const upcoming = matches?.filter((m) => new Date(m.kickoff_at) > new Date()).length ?? 0;
+      const lbArr = fullLb ?? [];
+      const myIdx = lbArr.findIndex((r: any) => r.user_id === user!.id);
+      const me = myIdx >= 0 ? lbArr[myIdx] : null;
       return {
-        points: lb?.total_points ?? 0,
-        exact: lb?.exact_hits ?? 0,
-        results: lb?.result_hits ?? 0,
+        points: me?.total_points ?? 0,
+        exact: me?.exact_hits ?? 0,
+        results: me?.result_hits ?? 0,
         predictionsCount: preds?.length ?? 0,
         totalMatches: total,
         finishedMatches: finished,
         upcomingMatches: upcoming,
+        position: myIdx >= 0 ? myIdx + 1 : null,
+        totalPlayers: lbArr.length,
       };
     },
   });
