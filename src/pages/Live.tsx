@@ -55,40 +55,24 @@ export default function Live() {
   const [selectedIdx, setSelectedIdx] = useState(0);
 
   // Partidos en vivo (puede haber varios simultáneos) + fallback al próximo
-  const { data: liveData, isLoading } = useQuery({
-    queryKey: ["live-match"],
-    refetchInterval: 30_000,
-    queryFn: async () => {
-      const nowIso = new Date().toISOString();
+  // Lista completa de matches con smart polling (solo desde Supabase).
+  const { data: allMatches, isLoading } = useLiveMatches();
 
-      // 1) Todos los partidos marcados como live
-      const { data: lives } = await supabase
-        .from("matches")
-        .select("*")
-        .eq("status", "live")
-        .order("kickoff_at");
-      if (lives && lives.length > 0) return { matches: lives, isLive: true };
-
-      // 2) Partidos cuyo kickoff ya pasó pero aún no están finished
-      const { data: ongoing } = await supabase
-        .from("matches")
-        .select("*")
-        .lte("kickoff_at", nowIso)
-        .neq("status", "finished")
-        .order("kickoff_at", { ascending: false });
-      if (ongoing && ongoing.length > 0) return { matches: ongoing, isLive: true };
-
-      // 3) Próximo partido programado
-      const { data: next } = await supabase
-        .from("matches")
-        .select("*")
-        .gt("kickoff_at", nowIso)
-        .order("kickoff_at")
-        .limit(1)
-        .maybeSingle();
-      return next ? { matches: [next], isLive: false } : null;
-    },
-  });
+  // Derivamos partidos en vivo / próximo desde el cache local — sin más fetches.
+  const liveData = (() => {
+    if (!allMatches) return null;
+    const now = new Date();
+    const lives = allMatches.filter((m) => m.status === "live");
+    if (lives.length > 0) return { matches: lives, isLive: true };
+    const ongoing = allMatches.filter(
+      (m) => new Date(m.kickoff_at) <= now && m.status !== "finished",
+    );
+    if (ongoing.length > 0) return { matches: ongoing, isLive: true };
+    const next = allMatches.find(
+      (m) => new Date(m.kickoff_at) > now && m.status === "scheduled",
+    );
+    return next ? { matches: [next], isLive: false } : null;
+  })();
 
   const matches = liveData?.matches ?? [];
   const safeIdx = Math.min(selectedIdx, Math.max(0, matches.length - 1));
