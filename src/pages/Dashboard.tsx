@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, ListChecks, Calendar, Target, TrendingUp, Loader2, Radio } from "lucide-react";
 import { Countdown } from "@/components/Countdown";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatAR } from "@/lib/datetime";
 
 export default function Dashboard() {
   const { user } = useAuth();
