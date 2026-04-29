@@ -134,6 +134,8 @@ export default function Ranking() {
   // ALL predictions, paginated — used for stage filters, streak, best-by-stage, and ↑/↓ deltas
   const { data: preds, isLoading: l1 } = useQuery({
     queryKey: ["ranking-preds-all"],
+    refetchOnMount: "always",
+    staleTime: 0,
     queryFn: async () => {
       const rows = await fetchAllPaginated<PredRow>(() =>
         supabase
