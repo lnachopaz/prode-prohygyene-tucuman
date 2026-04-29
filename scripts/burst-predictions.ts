@@ -105,13 +105,6 @@ async function main() {
   console.log(`💥 Disparando ${clients.length * MATCHES_PER} upserts SIMULTÁNEOS...`);
   const burstStart = Date.now();
   await Promise.all(
-    clients.map(({ idx, client }) =>
-      burstUser(idx, client, matchIds, client.auth.getSession ? null as any : null).catch(() => {}),
-    ),
-  );
-
-  // Re-disparar con userId real
-  await Promise.all(
     clients.map(async ({ idx, client }) => {
       const { data } = await client.auth.getSession();
       const uid = data.session?.user.id;
