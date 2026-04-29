@@ -135,6 +135,17 @@ export default function Dashboard() {
         <StatCard icon={<ListChecks className="h-4 w-4" />} label="Pronósticos" value={`${stats?.predictionsCount ?? 0}/${stats?.totalMatches ?? 0}`} />
       </div>
 
+      {stats?.position && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-4 flex items-center justify-between flex-wrap gap-2">
+            <div className="text-sm">
+              Estás en el puesto <strong className="text-primary text-base">#{stats.position}</strong> de <strong>{stats.totalPlayers}</strong> participantes.
+            </div>
+            <Button size="sm" variant="outline" asChild><Link to="/ranking">Ver ranking completo</Link></Button>
+          </CardContent>
+        </Card>
+      )}
+
       {pendingPredictions > 0 && (
         <Card className="border-primary/40 bg-primary/5">
           <CardContent className="p-4 flex items-center justify-between flex-wrap gap-2">
