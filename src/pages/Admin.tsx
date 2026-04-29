@@ -555,6 +555,7 @@ function SyncAdmin() {
       </Card>
 
       <ExportRanking />
+      <BackupAllPredictions />
     </div>
   );
 }
