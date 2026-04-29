@@ -103,7 +103,7 @@ export default function Dashboard() {
               <div className="min-w-0">
                 <div className={`text-xs uppercase tracking-wider font-semibold mb-1 flex items-center gap-1 ${isLive ? "text-destructive" : "text-primary"}`}>
                   <Radio className={`h-3 w-3 ${isLive ? "animate-pulse" : ""}`} />
-                  {isLive ? "En vivo ahora" : "Próximo partido"}
+                  {isLive ? "En juego" : "Próximo partido"}
                 </div>
                 <div className="text-lg font-bold truncate">{featured.team_a} vs {featured.team_b}</div>
                 <div className="text-xs text-muted-foreground">
@@ -112,11 +112,11 @@ export default function Dashboard() {
               </div>
               {isLive ? (
                 <div className="flex flex-col items-center md:items-end">
-                  <div className="text-3xl font-bold tabular-nums">
-                    {featured.score_a ?? 0} <span className="text-muted-foreground">-</span> {featured.score_b ?? 0}
+                  <div className="text-sm text-muted-foreground italic">
+                    Resultado al finalizar
                   </div>
                   <Button asChild size="sm" variant="outline" className="mt-2">
-                    <Link to="/live">Ver en vivo</Link>
+                    <Link to="/live">Ver en juego</Link>
                   </Button>
                 </div>
               ) : (
