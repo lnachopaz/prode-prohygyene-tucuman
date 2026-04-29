@@ -845,7 +845,7 @@ function TestModeAdmin() {
             <Card key={m.id}>
               <CardContent className="p-3 flex flex-wrap items-center gap-2">
                 <div className="flex-1 min-w-[200px]">
-                  <div className="text-xs text-muted-foreground">{format(new Date(m.kickoff_at), "dd/MM HH:mm")}</div>
+                  <div className="text-xs text-muted-foreground">{formatAR(m.kickoff_at, "dd/MM HH:mm")}</div>
                   <div className="font-medium flex items-center gap-2">
                     {m.team_a} vs {m.team_b}
                     {m.test_mode && (
