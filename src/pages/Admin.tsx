@@ -1085,7 +1085,7 @@ function PredictionsAdmin() {
                     return (
                       <div key={r.id} className="grid grid-cols-[120px_1fr_70px_70px_60px] gap-2 px-3 py-2 items-center text-sm">
                         <div className="text-xs text-muted-foreground">
-                          <div>{format(new Date(m.kickoff_at), "dd/MM HH:mm")}</div>
+                          <div>{formatAR(m.kickoff_at, "dd/MM HH:mm")}</div>
                           <div className="text-[10px]">{m.stage}</div>
                         </div>
                         <div className="font-medium truncate">{m.team_a} vs {m.team_b}</div>
