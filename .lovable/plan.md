@@ -1,51 +1,61 @@
-# Plan: Reemplazar "Live" por "En juego"
+# Plan: Mejorar pestaña Ranking (más info + fix mobile)
 
-## Objetivo
-Sacar la pestaña Live (lenta, problemática) y reemplazarla por una pestaña "En juego" liviana que:
-- Muestra el próximo partido con countdown.
-- Lista los partidos en curso (sin marcador en vivo, ya que la API se actualiza al final).
-- Una vez cerrados los pronósticos (1h antes), muestra la tabla de qué pronosticó cada usuario.
-- Aclara visiblemente que **los resultados se mostrarán al finalizar el partido**.
-- Al finalizar el partido, el edge function `sync-live-matches` actualiza el marcador y se recalculan los puntos automáticamente (ya implementado vía trigger).
+## Problemas actuales
+1. **Mobile**: las 7 columnas (`#`, ↑↓, jugador, 🔥, plenos, resultados, total) suman ~280px fijos + gaps; en pantallas <400px se aprieta y los puntos quedan recortados o pegados al borde.
+2. **Poca info contextual**: no se ve el promedio de puntos por partido, cuántos pronósticos cargó cada uno, ni gap respecto al líder/usuario propio.
 
 ## Cambios
 
-### 1. Navegación (`src/components/AppLayout.tsx`)
-- Renombrar el item "Live" → **"En juego"** en nav desktop y mobile.
-- Mantener el icono `Radio` (o cambiar a `Swords` para reflejar mejor "en juego").
-- La ruta `/live` se mantiene por compatibilidad de enlaces internos.
+### 1. Header con tarjeta personal "Mi posición" (nuevo)
+Arriba del filtro de fases, una card compacta con:
+- Mi puesto (#X de Y) + delta vs jornada anterior.
+- Mis puntos totales · plenos · aciertos resultado · racha.
+- **Diferencia con el líder** (ej: "−12 pts del 1°") y **diferencia con el siguiente** (ej: "+3 pts sobre #4").
+- Promedio de puntos por partido finalizado.
 
-### 2. Página "En juego" (`src/pages/Live.tsx` — reescritura simplificada)
-Reemplazar la página actual con una versión más liviana:
-- **Sin auto-sync agresivo cada 30s** ni invocación manual del edge function. Solo lectura desde Supabase con `useLiveMatches` (smart polling existente: 1 min si hay live, 5 min si no).
-- **Sin cálculo de marcadores parciales**: la API solo actualiza al finalizar.
-- Layout:
-  - Título: **"En juego"**.
-  - Aviso destacado (banner/Alert): *"Los marcadores se actualizan al finalizar cada partido. Mientras tanto, podés ver los pronósticos del grupo una vez cerrada la ventana (1 hora antes del inicio)."*
-  - **Próximo partido**: card con equipos, banderas, kickoff y `<Countdown />`.
-  - **Partidos en curso** (status `live` o ya iniciados sin finalizar): card simple sin marcador, indicando "En juego — resultado al finalizar".
-  - **Pronósticos del grupo**: para el partido seleccionado (próximo o en curso), si los pronósticos están cerrados (kickoff − 1h ya pasó), mostrar la tabla con `display_name` + `pred_a-pred_b`. Sin badges de puntos parciales.
-  - Si el partido está finalizado, mostrar marcador final + badges de puntos (3/1/0).
+### 2. Estadísticas globales del torneo (nuevo, card pequeña)
+Strip de stats arriba:
+- Partidos jugados / total.
+- Total de pronósticos cargados.
+- Promedio de aciertos del grupo.
+- Líder actual (nombre + pts).
 
-### 3. Dashboard (`src/pages/Dashboard.tsx`)
-- En la card del próximo partido, cuando `isLive`:
-  - Cambiar texto "En vivo ahora" → **"En juego"**.
-  - Quitar la línea de marcador (`{score_a} - {score_b}`) y reemplazar por texto: *"Resultado al finalizar"*.
-  - Botón "Ver en vivo" → **"Ver en juego"** (sigue apuntando a `/live`).
+### 3. Tabla rediseñada con layout responsive
+Reemplazar el `grid-cols-[...]` fijo por un layout que funcione en mobile:
 
-### 4. Sincronización al finalizar (sin cambios de código)
-El edge function `sync-live-matches` ya:
-- Sincroniza partidos en estado `live` y `scheduled` próximos / pasados hasta 4h.
-- Actualiza `score_a`, `score_b`, `status` → `finished` cuando la API lo reporta.
-- El trigger DB `recalc_predictions_for_match` ya recalcula puntos automáticamente.
-- El cron existente (si está) sigue corriendo. **Verificación recomendada**: confirmar que hay un cron periódico invocando `sync-live-matches` cada N minutos para que los partidos finalicen sin intervención. Si no existe, agregarlo (cron cada 5 min).
+**Mobile (<640px)** — fila apilada en 2 niveles:
+```
+[#] [avatar] Nombre (vos)        [TOTAL pts]
+              🔥3 · ✓5 plenos · 8 res · ↑2
+```
+- Total de puntos a la derecha grande y legible.
+- Stats secundarias en línea inferior con iconos pequeños.
+
+**Desktop (≥640px)** — tabla con columnas (más datos):
+```
+# | Δ | Jugador | Pronós | Plenos | Resultados | Racha | Prom | Total
+```
+- Agregar columnas: **Pronós** (cuántos cargó) y **Prom** (puntos / partidos finalizados).
+
+### 4. Mejor presentación visual
+- Top 3 con medalla 🥇🥈🥉 (icono Trophy/Medal) en vez de solo color de número.
+- Avatar (si existe `avatar_url`) en círculo pequeño junto al nombre.
+- Badge "Líder" para el #1.
+- Resaltado más visible para "vos" (border-l accent + bg).
+
+### 5. Pequeñas mejoras de UX
+- Sticky header de la tabla al scrollear.
+- Texto "actualizado hace X" abajo.
+- Mantener filtros de fase tal cual.
 
 ## Detalles técnicos
+- Todo CSS-only con Tailwind (`hidden sm:grid` / `grid sm:hidden`) — sin librerías nuevas.
+- Reusar tokens semánticos existentes (`text-primary`, `text-success`, `text-warning`, `bg-muted`).
+- Calcular nuevos derivados en el `useMemo` existente (`avg`, gaps al líder/siguiente) — sin queries nuevas.
+- No tocar lógica de fetch ni de agregación por fase.
 
-- Mantener la ruta `/live` para no romper enlaces existentes (Dashboard linkea ahí).
-- `useLiveMatches` se sigue usando: ya hace smart polling sin spam.
-- Quitar imports no usados tras la simplificación: `Loader2` solo si hace falta, `RefreshCw`, `useEffect` del auto-sync, `toast`, `subHours` (la lógica de "predsLocked" puede usar comparación simple `kickoff − 1h <= now`).
-- Mantener query `live-predictions` para tabla de pronósticos del grupo, pero sin `points` parciales en la UI (solo cuando `status === 'finished'`).
+## Archivos a editar
+- `src/pages/Ranking.tsx` (único archivo).
 
-## Pregunta abierta (opcional, podemos resolver al implementar)
-- ¿Confirmar si querés que también renombre el icono (de `Radio` a `Swords` / `Activity`) o lo dejo como está?
+## Pregunta abierta
+¿Mantengo la card "Mejor por fase" arriba como está, o la muevo abajo de la tabla para priorizar primero "Mi posición" y "Stats globales" en el viewport inicial mobile?
