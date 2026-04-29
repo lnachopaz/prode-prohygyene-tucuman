@@ -157,7 +157,7 @@ function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-center">
           <div>
             <div className="text-xs text-muted-foreground">
-              {format(new Date(match.kickoff_at), "dd/MM HH:mm")} · {match.stage}
+              {formatAR(match.kickoff_at, "dd/MM HH:mm")} · {match.stage}
               {match.group_name ? ` · ${match.group_name}` : ""}
             </div>
             <div className="font-semibold">{match.team_a} vs {match.team_b}</div>
