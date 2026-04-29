@@ -1,61 +1,89 @@
-# Plan: Mejorar pestaña Ranking (más info + fix mobile)
+# Plan: Nuevo sistema de puntos con multiplicadores
 
-## Problemas actuales
-1. **Mobile**: las 7 columnas (`#`, ↑↓, jugador, 🔥, plenos, resultados, total) suman ~280px fijos + gaps; en pantallas <400px se aprieta y los puntos quedan recortados o pegados al borde.
-2. **Poca info contextual**: no se ve el promedio de puntos por partido, cuántos pronósticos cargó cada uno, ni gap respecto al líder/usuario propio.
+## Reglas finales acordadas
+
+| Condición | Multiplicador |
+|---|---|
+| Partido de Argentina | **x2** |
+| Final del Mundial | **x3** |
+| Octavos / Cuartos / Semis (eliminatorias previas a la final) | **x1.2** |
+| Final de Argentina (caso combinado) | **x6** (2 × 3, se acumulan) |
+| Argentina en Semis (ej.) | **x2.4** (2 × 1.2) |
+
+Base sigue igual: 3 pts pleno, 1 pt resultado, 0 pts si falla.
+
+Sin penalización por no pronosticar.
 
 ## Cambios
 
-### 1. Header con tarjeta personal "Mi posición" (nuevo)
-Arriba del filtro de fases, una card compacta con:
-- Mi puesto (#X de Y) + delta vs jornada anterior.
-- Mis puntos totales · plenos · aciertos resultado · racha.
-- **Diferencia con el líder** (ej: "−12 pts del 1°") y **diferencia con el siguiente** (ej: "+3 pts sobre #4").
-- Promedio de puntos por partido finalizado.
+### 1. Función `calc_points` en la base de datos
+Reescribirla para que reciba el partido completo y aplique los multiplicadores. Nueva firma sugerida:
 
-### 2. Estadísticas globales del torneo (nuevo, card pequeña)
-Strip de stats arriba:
-- Partidos jugados / total.
-- Total de pronósticos cargados.
-- Promedio de aciertos del grupo.
-- Líder actual (nombre + pts).
-
-### 3. Tabla rediseñada con layout responsive
-Reemplazar el `grid-cols-[...]` fijo por un layout que funcione en mobile:
-
-**Mobile (<640px)** — fila apilada en 2 niveles:
+```sql
+calc_points_v2(pa, pb, sa, sb, team_a, team_b, stage)
+  base = 3 si pleno, 1 si resultado, 0 si falla
+  mult = 1
+  si team_a o team_b contiene 'Argentina' → mult *= 2
+  si stage es la final del Mundial → mult *= 3
+  sino si stage es octavos/cuartos/semis → mult *= 1.2
+  return floor(base * mult)
 ```
-[#] [avatar] Nombre (vos)        [TOTAL pts]
-              🔥3 · ✓5 plenos · 8 res · ↑2
-```
-- Total de puntos a la derecha grande y legible.
-- Stats secundarias en línea inferior con iconos pequeños.
 
-**Desktop (≥640px)** — tabla con columnas (más datos):
-```
-# | Δ | Jugador | Pronós | Plenos | Resultados | Racha | Prom | Total
-```
-- Agregar columnas: **Pronós** (cuántos cargó) y **Prom** (puntos / partidos finalizados).
+Detalle:
+- Detección de Argentina: `team_a ILIKE '%argentina%' OR team_b ILIKE '%argentina%'`.
+- Detección de fase por `matches.stage` (texto). Mapeo robusto:
+  - **Final**: contiene `'final'` y NO contiene `'semi'` ni `'tercer'/'third'/'1/2'`.
+  - **Eliminatorias x1.2**: contiene `'octavo'/'round of 16'/'last 16'` o `'cuarto'/'quarter'` o `'semi'`.
+  - **Tercer puesto**: lo tratamos como x1.2 también (es eliminatoria). Puede revisarse.
+  - Resto (grupos): x1.
+- Como los multiplicadores no enteros (1.2, 2.4, etc.) generan decimales, se usa `ROUND(base * mult)` para mantener `points` como `int`. Ejemplos:
+  - Pleno en cuartos: 3 × 1.2 = 3.6 → **4 pts**
+  - Resultado en cuartos: 1 × 1.2 = 1.2 → **1 pt**
+  - Pleno Argentina en semis: 3 × 2 × 1.2 = 7.2 → **7 pts**
+  - Pleno Argentina en final: 3 × 2 × 3 = **18 pts**
 
-### 4. Mejor presentación visual
-- Top 3 con medalla 🥇🥈🥉 (icono Trophy/Medal) en vez de solo color de número.
-- Avatar (si existe `avatar_url`) en círculo pequeño junto al nombre.
-- Badge "Líder" para el #1.
-- Resaltado más visible para "vos" (border-l accent + bg).
+### 2. Mantener compatibilidad
+- La función vieja `calc_points(pa,pb,sa,sb)` se mantiene (algunas migraciones la referencian) pero internamente llama a la nueva con valores neutros, **o** la actualizamos para que siga existiendo y creamos `calc_points_match(pred_a, pred_b, match_id)` como wrapper.
+- Actualizar:
+  - `recalc_predictions_for_match` (trigger en matches) → usar la nueva fórmula con datos de `NEW`.
+  - `recalc_match_points(_match_id)` (función admin) → idem, lee el match y aplica.
 
-### 5. Pequeñas mejoras de UX
-- Sticky header de la tabla al scrollear.
-- Texto "actualizado hace X" abajo.
-- Mantener filtros de fase tal cual.
+### 3. Recalcular puntos históricos
+Una sola vez en la migración: `UPDATE predictions ... SET points = nuevo_cálculo` para todos los partidos ya finalizados, así el ranking refleja las nuevas reglas desde el inicio.
+
+### 4. UI: actualizar `TournamentRules.tsx`
+Reescribir la sección Puntaje:
+
+> **Multiplicadores** (se acumulan si coinciden):
+> - **x2** en partidos de Argentina
+> - **x3** en la Final del Mundial
+> - **x1.2** en Octavos, Cuartos y Semifinales
+>
+> Ejemplos:
+> - Pleno en un partido normal: 3 pts
+> - Pleno en cuartos de Argentina: 3 × 2 × 1.2 = **7 pts**
+> - Pleno en la Final con Argentina: 3 × 2 × 3 = **18 pts**
+
+### 5. UI: mostrar el multiplicador en cada partido
+En `Predictions.tsx` y en la tarjeta del próximo partido (Dashboard), agregar un badge cuando aplica:
+- 🇦🇷 **x2** si juega Argentina
+- 🏆 **x3** si es la final
+- ⚡ **x1.2** si es octavos/cuartos/semis
+- Combinado: **x6** si es final de Argentina, **x2.4** si Argentina en semis, etc.
+
+Esto hace el sistema transparente y agrega tensión a los partidos importantes.
 
 ## Detalles técnicos
-- Todo CSS-only con Tailwind (`hidden sm:grid` / `grid sm:hidden`) — sin librerías nuevas.
-- Reusar tokens semánticos existentes (`text-primary`, `text-success`, `text-warning`, `bg-muted`).
-- Calcular nuevos derivados en el `useMemo` existente (`avg`, gaps al líder/siguiente) — sin queries nuevas.
-- No tocar lógica de fetch ni de agregación por fase.
 
-## Archivos a editar
-- `src/pages/Ranking.tsx` (único archivo).
+- Los puntos en `predictions.points` quedan en INTEGER (con redondeo `ROUND`).
+- La detección de fase por texto es lo más portable; alternativa más robusta sería agregar columnas `is_final BOOLEAN` y `is_knockout BOOLEAN` a `matches`, pero implica seedear cada partido. **Propongo empezar por detección por texto** y, si vemos errores, migrar a columnas.
+- Performance: `calc_points` sigue siendo `IMMUTABLE`/`STABLE` y trivial.
 
-## Pregunta abierta
-¿Mantengo la card "Mejor por fase" arriba como está, o la muevo abajo de la tabla para priorizar primero "Mi posición" y "Stats globales" en el viewport inicial mobile?
+## Pregunta abierta menor
+- **Tercer puesto** (3°/4°): ¿lo tratamos como x1.2 (eliminatoria) o como partido normal x1? Sugiero **x1.2** por consistencia, pero si querés que solo cuente como un partido más, lo dejo en x1.
+
+## Archivos a tocar
+- `supabase/migrations/<nuevo>.sql` — nueva función + recálculo histórico.
+- `src/components/TournamentRules.tsx` — texto de reglas.
+- `src/pages/Predictions.tsx` — badge de multiplicador junto a cada partido.
+- `src/pages/Dashboard.tsx` — badge en la tarjeta de "próximo partido" (opcional).
