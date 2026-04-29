@@ -477,10 +477,6 @@ export default function Ranking() {
                     </span>
                     <span>{deltaIcon}</span>
                     <span className="font-medium truncate flex items-center gap-2 min-w-0">
-                      <Avatar className="h-7 w-7 shrink-0">
-                        {row.avatar_url && <AvatarImage src={row.avatar_url} alt={row.display_name} />}
-                        <AvatarFallback className="text-[10px]">{initials(row.display_name)}</AvatarFallback>
-                      </Avatar>
                       <span className="truncate">{row.display_name}</span>
                       {isMe && <span className="text-xs text-primary">(vos)</span>}
                     </span>
