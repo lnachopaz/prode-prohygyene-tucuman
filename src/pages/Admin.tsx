@@ -907,3 +907,390 @@ function TestModeAdmin() {
     </div>
   );
 }
+
+// ============================================================
+// PRONÓSTICOS DE OTROS USUARIOS (vista admin)
+// ============================================================
+function PredictionsAdmin() {
+  const [selectedUser, setSelectedUser] = useState<string>("");
+  const [search, setSearch] = useState("");
+  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const { data: users } = useQuery({
+    queryKey: ["pred-admin-users"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, display_name, status")
+        .eq("status", "approved")
+        .order("display_name");
+      if (error) throw error;
+      const { data: emails } = await supabase.rpc("list_users_with_email");
+      const emailMap = new Map<string, string>();
+      (emails ?? []).forEach((r: any) => emailMap.set(r.id, r.email));
+      return (data ?? []).map((u: any) => ({ ...u, email: emailMap.get(u.id) ?? "" }));
+    },
+  });
+
+  const { data: rows, isLoading } = useQuery({
+    queryKey: ["pred-admin-rows", selectedUser],
+    enabled: !!selectedUser,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("predictions")
+        .select("id, pred_a, pred_b, points, match:matches(id, team_a, team_b, stage, group_name, status, score_a, score_b, kickoff_at)")
+        .eq("user_id", selectedUser);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+  const filtered = (rows ?? []).filter((r) => {
+    if (!r.match) return false;
+    if (statusFilter !== "all" && r.match.status !== statusFilter) return false;
+    if (stageFilter !== "all") {
+      const s = (r.match.stage || "").toLowerCase();
+      if (stageFilter === "groups" && !(s.includes("grupo") || s.includes("group"))) return false;
+      if (stageFilter === "r16" && !(s.includes("octavo") || s.includes("round of 16") || s.includes("last 16"))) return false;
+      if (stageFilter === "qf" && !(s.includes("cuarto") || s.includes("quarter"))) return false;
+      if (stageFilter === "sf" && !s.includes("semi")) return false;
+      if (stageFilter === "final" && !(s.includes("final") || s.includes("tercer"))) return false;
+    }
+    return true;
+  }).sort((a, b) => new Date(a.match.kickoff_at).getTime() - new Date(b.match.kickoff_at).getTime());
+
+  const finished = filtered.filter((r) => r.match.status === "finished");
+  const totalPts = finished.reduce((s, r) => s + (r.points || 0), 0);
+  const exactos = finished.filter((r) => r.points === 3).length;
+  const aciertos = finished.filter((r) => r.points === 1).length;
+  const efectividad = finished.length ? Math.round(((exactos + aciertos) / finished.length) * 100) : 0;
+
+  const filteredUsers = (users ?? []).filter((u: any) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return u.display_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
+
+  function exportCSV() {
+    if (filtered.length === 0) return;
+    const userName = users?.find((u: any) => u.id === selectedUser)?.display_name ?? "usuario";
+    const header = ["Fecha", "Fase", "Grupo", "Partido", "Pronostico", "Resultado", "Estado", "Puntos"];
+    const lines = [header.join(",")];
+    for (const r of filtered) {
+      const m = r.match;
+      const realScore = m.score_a != null && m.score_b != null ? `${m.score_a}-${m.score_b}` : "—";
+      lines.push([
+        format(new Date(m.kickoff_at), "yyyy-MM-dd HH:mm"),
+        `"${m.stage}"`,
+        m.group_name ?? "",
+        `"${m.team_a} vs ${m.team_b}"`,
+        `${r.pred_a}-${r.pred_b}`,
+        realScore,
+        m.status,
+        r.points ?? 0,
+      ].join(","));
+    }
+    const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pronosticos-${userName.replace(/\s+/g, "_")}-${format(new Date(), "yyyyMMdd-HHmm")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV descargado");
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Eye className="h-4 w-4" /> Ver pronósticos de cualquier participante
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre o email…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          <Select value={selectedUser} onValueChange={setSelectedUser}>
+            <SelectTrigger><SelectValue placeholder={`Elegí un participante (${filteredUsers.length} disponibles)`} /></SelectTrigger>
+            <SelectContent className="max-h-80">
+              {filteredUsers.map((u: any) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.display_name} <span className="text-muted-foreground text-xs">· {u.email}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      {selectedUser && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Puntos</div><div className="text-2xl font-bold">{totalPts}</div></CardContent></Card>
+            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Plenos (3pts)</div><div className="text-2xl font-bold text-success">{exactos}</div></CardContent></Card>
+            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Resultado (1pt)</div><div className="text-2xl font-bold text-warning">{aciertos}</div></CardContent></Card>
+            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Efectividad</div><div className="text-2xl font-bold">{efectividad}%</div></CardContent></Card>
+          </div>
+
+          <div className="flex flex-wrap gap-2 items-center">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value="scheduled">Programados</SelectItem>
+                <SelectItem value="live">En vivo</SelectItem>
+                <SelectItem value="finished">Finalizados</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={stageFilter} onValueChange={setStageFilter}>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las fases</SelectItem>
+                <SelectItem value="groups">Grupos</SelectItem>
+                <SelectItem value="r16">Octavos</SelectItem>
+                <SelectItem value="qf">Cuartos</SelectItem>
+                <SelectItem value="sf">Semis</SelectItem>
+                <SelectItem value="final">Final</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="outline" onClick={exportCSV} disabled={filtered.length === 0}>
+              <FileDown className="h-4 w-4 mr-2" />Exportar CSV
+            </Button>
+            <span className="text-xs text-muted-foreground ml-auto">{filtered.length} pronósticos</span>
+          </div>
+
+          {isLoading ? (
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  <div className="grid grid-cols-[120px_1fr_70px_70px_60px] gap-2 px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase">
+                    <span>Fecha</span><span>Partido</span><span className="text-center">Pron.</span><span className="text-center">Real</span><span className="text-right">Pts</span>
+                  </div>
+                  {filtered.map((r) => {
+                    const m = r.match;
+                    const real = m.score_a != null && m.score_b != null ? `${m.score_a}-${m.score_b}` : "—";
+                    return (
+                      <div key={r.id} className="grid grid-cols-[120px_1fr_70px_70px_60px] gap-2 px-3 py-2 items-center text-sm">
+                        <div className="text-xs text-muted-foreground">
+                          <div>{format(new Date(m.kickoff_at), "dd/MM HH:mm")}</div>
+                          <div className="text-[10px]">{m.stage}</div>
+                        </div>
+                        <div className="font-medium truncate">{m.team_a} vs {m.team_b}</div>
+                        <div className="text-center font-mono">{r.pred_a}-{r.pred_b}</div>
+                        <div className="text-center font-mono text-muted-foreground">{real}</div>
+                        <div className="text-right font-bold">
+                          {m.status === "finished" ? (
+                            <span className={r.points === 3 ? "text-success" : r.points === 1 ? "text-warning" : "text-muted-foreground"}>
+                              {r.points ?? 0}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {filtered.length === 0 && (
+                    <div className="px-4 py-8 text-center text-muted-foreground text-sm">No hay pronósticos con esos filtros.</div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// SIMULADOR MASIVO (panel adicional en Modo Prueba)
+// ============================================================
+export function BulkSimulator() {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const { data: stats } = useQuery({
+    queryKey: ["bulk-stats"],
+    refetchInterval: 5000,
+    queryFn: async () => {
+      const [{ count: testUsers }, { count: realUsers }, { data: matches }, predsAll] = await Promise.all([
+        supabase.from("profiles").select("id", { count: "exact", head: true }).like("display_name", "Test User%"),
+        supabase.from("profiles").select("id", { count: "exact", head: true }).not("display_name", "like", "Test User%"),
+        supabase.from("matches").select("id, status"),
+        fetchAllPaginated<{ id: string }>(() => supabase.from("predictions").select("id")),
+      ]);
+      const finished = matches?.filter((m: any) => m.status === "finished").length ?? 0;
+      const live = matches?.filter((m: any) => m.status === "live").length ?? 0;
+      const scheduled = matches?.filter((m: any) => m.status === "scheduled").length ?? 0;
+      return {
+        testUsers: testUsers ?? 0,
+        realUsers: realUsers ?? 0,
+        finished, live, scheduled,
+        predictions: predsAll.length,
+      };
+    },
+  });
+
+  function refresh() {
+    qc.invalidateQueries({ queryKey: ["bulk-stats"] });
+    qc.invalidateQueries({ queryKey: ["test-matches"] });
+    qc.invalidateQueries({ queryKey: ["admin-matches"] });
+    qc.invalidateQueries({ queryKey: ["matches"] });
+    qc.invalidateQueries({ queryKey: ["leaderboard"] });
+    qc.invalidateQueries({ queryKey: ["ranking-leaderboard"] });
+    qc.invalidateQueries({ queryKey: ["ranking-preds-all"] });
+    qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    qc.invalidateQueries({ queryKey: ["dashboard-top-ranking"] });
+  }
+
+  async function advance5() {
+    setBusy("advance");
+    try {
+      const { data: next } = await supabase
+        .from("matches").select("id").eq("status", "scheduled").order("kickoff_at").limit(5);
+      if (!next || next.length === 0) { toast.error("No quedan partidos programados"); return; }
+      for (const m of next) {
+        const score_a = Math.floor(Math.random() * 4);
+        const score_b = Math.floor(Math.random() * 4);
+        await supabase.from("matches").update({ status: "finished", score_a, score_b, test_mode: true }).eq("id", m.id);
+      }
+      toast.success(`✅ ${next.length} partidos finalizados con resultado aleatorio`);
+      refresh();
+    } finally { setBusy(null); }
+  }
+
+  async function start3Live() {
+    setBusy("live");
+    try {
+      const { data: next } = await supabase
+        .from("matches").select("id").eq("status", "scheduled").order("kickoff_at").limit(3);
+      if (!next || next.length === 0) { toast.error("No quedan partidos programados"); return; }
+      for (const m of next) {
+        await supabase.from("matches").update({ status: "live", score_a: 0, score_b: 0, test_mode: true }).eq("id", m.id);
+      }
+      toast.success(`⚽ ${next.length} partidos en vivo (0-0)`);
+      refresh();
+    } finally { setBusy(null); }
+  }
+
+  async function goalRain() {
+    setBusy("rain");
+    try {
+      const { data: live } = await supabase.from("matches").select("id, score_a, score_b").eq("status", "live");
+      if (!live || live.length === 0) { toast.error("No hay partidos en vivo. Apretá primero 'Poner 3 en vivo'."); return; }
+      // 10 ticks each 3 seconds = 30 seconds. Each tick adds a goal to one random team in one random live match.
+      for (let i = 0; i < 10; i++) {
+        const m = live[Math.floor(Math.random() * live.length)];
+        const side: "a" | "b" = Math.random() < 0.5 ? "a" : "b";
+        const newA = (m.score_a ?? 0) + (side === "a" ? 1 : 0);
+        const newB = (m.score_b ?? 0) + (side === "b" ? 1 : 0);
+        await supabase.from("matches").update({ score_a: newA, score_b: newB }).eq("id", m.id);
+        if (side === "a") m.score_a = newA; else m.score_b = newB;
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+      toast.success("🎉 Goleada terminada — andá a /live a verla");
+      refresh();
+    } finally { setBusy(null); }
+  }
+
+  async function resetTest() {
+    if (!confirm("¿Resetear todos los partidos en modo prueba a 'programado'? No toca los partidos reales.")) return;
+    setBusy("reset");
+    try {
+      const { data: testMatches } = await supabase.from("matches").select("id").eq("test_mode", true);
+      if (!testMatches || testMatches.length === 0) { toast.info("Nada que resetear"); return; }
+      for (const m of testMatches) {
+        await supabase.from("matches").update({ status: "scheduled", score_a: null, score_b: null, test_mode: false }).eq("id", m.id);
+      }
+      toast.success(`↩️ ${testMatches.length} partidos reseteados`);
+      refresh();
+    } finally { setBusy(null); }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-yellow-500/40 bg-yellow-500/5">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <FlaskConical className="h-4 w-4 text-yellow-600" /> Simulador masivo (con los 100 usuarios test)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+            <div className="rounded border bg-background p-2"><div className="text-xs text-muted-foreground">Usuarios test</div><div className="text-lg font-bold">{stats?.testUsers ?? "…"}</div></div>
+            <div className="rounded border bg-background p-2"><div className="text-xs text-muted-foreground">Usuarios reales</div><div className="text-lg font-bold">{stats?.realUsers ?? "…"}</div></div>
+            <div className="rounded border bg-background p-2"><div className="text-xs text-muted-foreground">Partidos</div><div className="text-sm font-bold">{stats?.finished ?? "…"} fin · {stats?.live ?? "…"} live · {stats?.scheduled ?? "…"} prog</div></div>
+            <div className="rounded border bg-background p-2"><div className="text-xs text-muted-foreground">Pronósticos cargados</div><div className="text-lg font-bold">{stats?.predictions?.toLocaleString() ?? "…"}</div></div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-2">
+            <Button onClick={advance5} disabled={busy !== null} className="h-auto py-3 justify-start" variant="default">
+              <FastForward className="h-5 w-5 mr-3" />
+              <div className="text-left">
+                <div className="font-semibold">Avanzar 5 partidos</div>
+                <div className="text-xs opacity-80 font-normal">Finaliza los próximos 5 con resultado aleatorio</div>
+              </div>
+              {busy === "advance" && <Loader2 className="h-4 w-4 ml-auto animate-spin" />}
+            </Button>
+            <Button onClick={start3Live} disabled={busy !== null} className="h-auto py-3 justify-start" variant="default">
+              <Play className="h-5 w-5 mr-3" />
+              <div className="text-left">
+                <div className="font-semibold">Poner 3 partidos en vivo</div>
+                <div className="text-xs opacity-80 font-normal">Marca 3 próximos como en vivo (0-0)</div>
+              </div>
+              {busy === "live" && <Loader2 className="h-4 w-4 ml-auto animate-spin" />}
+            </Button>
+            <Button onClick={goalRain} disabled={busy !== null} className="h-auto py-3 justify-start" variant="secondary">
+              <Zap className="h-5 w-5 mr-3" />
+              <div className="text-left">
+                <div className="font-semibold">Goleada en vivo (30s)</div>
+                <div className="text-xs opacity-80 font-normal">Sumá goles cada 3s · andá a /live a mirar</div>
+              </div>
+              {busy === "rain" && <Loader2 className="h-4 w-4 ml-auto animate-spin" />}
+            </Button>
+            <Button onClick={resetTest} disabled={busy !== null} className="h-auto py-3 justify-start" variant="outline">
+              <RotateCcw className="h-5 w-5 mr-3" />
+              <div className="text-left">
+                <div className="font-semibold">Reset total prueba</div>
+                <div className="text-xs opacity-80 font-normal">Vuelve los partidos test a 'programado'</div>
+              </div>
+              {busy === "reset" && <Loader2 className="h-4 w-4 ml-auto animate-spin" />}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-blue-500/40 bg-blue-500/5">
+        <CardHeader><CardTitle className="text-base">✅ Cómo verificar</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <ol className="list-decimal list-inside space-y-1.5">
+            <li>Abrí <a href="/ranking" target="_blank" rel="noreferrer" className="text-primary underline">/ranking</a> en otra pestaña → debería liderar <strong>Test User 092</strong> o similar con ~28 pts.</li>
+            <li>Apretá <strong>"Avanzar 5 partidos"</strong> y volvé a /ranking → vas a ver el orden cambiando.</li>
+            <li>Andá a <a href="/" target="_blank" rel="noreferrer" className="text-primary underline">/ (Resumen)</a> → el Top 5 debe coincidir EXACTO con el ranking.</li>
+            <li>Apretá <strong>"Poner 3 partidos en vivo"</strong> + <strong>"Goleada en vivo"</strong>, abrí <a href="/live" target="_blank" rel="noreferrer" className="text-primary underline">/live</a> y mirá los marcadores y puntos parciales.</li>
+            <li>Tab <strong>"Pronósticos"</strong> → elegí "Test User 092" y verificá que ves sus 104 pronósticos con puntos.</li>
+            <li>Cuando termines de probar, apretá <strong>"Reset total prueba"</strong> para dejar los partidos limpios.</li>
+          </ol>
+          <div className="mt-3 p-2 rounded bg-background border text-xs">
+            <div className="font-semibold mb-1">Credenciales de los usuarios de prueba (por si querés loguearte como uno):</div>
+            <div className="font-mono">test001@prode.test … test100@prode.test</div>
+            <div className="font-mono">contraseña: <strong>Prode2026!</strong></div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
