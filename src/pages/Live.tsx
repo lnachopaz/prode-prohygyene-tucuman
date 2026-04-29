@@ -8,6 +8,12 @@ import { Loader2, Radio, Clock, Trophy, RefreshCw } from "lucide-react";
 import { format, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { Countdown } from "@/components/Countdown";
+import {
+  useLiveMatches,
+  LIVE_INTERVAL_MS,
+  IDLE_INTERVAL_MS,
+  MATCHES_STALE_TIME_MS,
+} from "@/hooks/useLiveMatches";
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
