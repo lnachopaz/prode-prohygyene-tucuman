@@ -113,7 +113,9 @@ export default function Live() {
   const { data: myPred } = useQuery({
     queryKey: ["live-my-pred", matchId, user?.id],
     enabled: !!matchId && !!user,
-    refetchInterval: 30_000,
+    staleTime: MATCHES_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+    refetchInterval: secondaryInterval,
     queryFn: async () => {
       const { data } = await supabase
         .from("predictions")
