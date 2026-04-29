@@ -13,7 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save, Lock, X } from "lucide-react";
+import { Loader2, Save, Lock, X, Pencil } from "lucide-react";
+import { MatchDetailsDialog } from "@/components/MatchDetailsDialog";
 import { toast } from "sonner";
 import { format, isAfter, subHours } from "date-fns";
 import { es } from "date-fns/locale";
@@ -34,6 +35,7 @@ type Match = {
   score_b: number | null;
   predictions_lock_mode?: "auto" | "force_open" | "force_closed";
   prediction_window_id: string | null;
+  venue?: string | null;
 };
 
 type PredictionWindow = {
@@ -418,10 +420,25 @@ function MatchCard({
         )}
 
         {!locked && (
-          <Button size="sm" className="w-full" onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Guardar pronóstico
+          <Button
+            size="sm"
+            className={`w-full ${prediction ? "bg-warning text-warning-foreground hover:bg-warning/90" : ""}`}
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : prediction ? (
+              <Pencil className="h-4 w-4 mr-2" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            {prediction ? "Editar pronóstico" : "Guardar pronóstico"}
           </Button>
+        )}
+
+        {match.status === "finished" && (
+          <MatchDetailsDialog match={match} />
         )}
       </CardContent>
     </Card>
