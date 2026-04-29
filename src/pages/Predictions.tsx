@@ -33,6 +33,15 @@ type Match = {
   score_a: number | null;
   score_b: number | null;
   predictions_lock_mode?: "auto" | "force_open" | "force_closed";
+  prediction_window_id: string | null;
+};
+
+type PredictionWindow = {
+  id: string;
+  label: string;
+  opens_at: string;
+  closes_at: string;
+  sort_order: number;
 };
 
 type Prediction = {
