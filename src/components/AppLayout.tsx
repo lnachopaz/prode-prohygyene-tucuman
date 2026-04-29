@@ -42,7 +42,7 @@ export default function AppLayout() {
               <ListChecks className="h-4 w-4" /> Pronósticos
             </NavLink>
             <NavLink to="/live" className={({ isActive }) => navItem(isActive)}>
-              <Radio className="h-4 w-4" /> Live
+              <Radio className="h-4 w-4" /> En juego
             </NavLink>
             <NavLink to="/ranking" className={({ isActive }) => navItem(isActive)}>
               <Trophy className="h-4 w-4" /> Ranking

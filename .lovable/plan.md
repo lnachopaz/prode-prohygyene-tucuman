@@ -1,79 +1,51 @@
+# Plan: Reemplazar "Live" por "En juego"
+
 ## Objetivo
+Sacar la pestaña Live (lenta, problemática) y reemplazarla por una pestaña "En juego" liviana que:
+- Muestra el próximo partido con countdown.
+- Lista los partidos en curso (sin marcador en vivo, ya que la API se actualiza al final).
+- Una vez cerrados los pronósticos (1h antes), muestra la tabla de qué pronosticó cada usuario.
+- Aclara visiblemente que **los resultados se mostrarán al finalizar el partido**.
+- Al finalizar el partido, el edge function `sync-live-matches` actualiza el marcador y se recalculan los puntos automáticamente (ya implementado vía trigger).
 
-Preparar el entorno para una prueba de carga real con 100 usuarios concurrentes prediciendo Arsenal vs Atlético de Madrid (UCL hoy), y dejar tu cuenta `chueca@gmail.com` (Ignacio Paz) como administradora.
+## Cambios
 
----
+### 1. Navegación (`src/components/AppLayout.tsx`)
+- Renombrar el item "Live" → **"En juego"** en nav desktop y mobile.
+- Mantener el icono `Radio` (o cambiar a `Swords` para reflejar mejor "en juego").
+- La ruta `/live` se mantiene por compatibilidad de enlaces internos.
 
-## 1) Crear admin `chueca@gmail.com` — Ignacio Paz
+### 2. Página "En juego" (`src/pages/Live.tsx` — reescritura simplificada)
+Reemplazar la página actual con una versión más liviana:
+- **Sin auto-sync agresivo cada 30s** ni invocación manual del edge function. Solo lectura desde Supabase con `useLiveMatches` (smart polling existente: 1 min si hay live, 5 min si no).
+- **Sin cálculo de marcadores parciales**: la API solo actualiza al finalizar.
+- Layout:
+  - Título: **"En juego"**.
+  - Aviso destacado (banner/Alert): *"Los marcadores se actualizan al finalizar cada partido. Mientras tanto, podés ver los pronósticos del grupo una vez cerrada la ventana (1 hora antes del inicio)."*
+  - **Próximo partido**: card con equipos, banderas, kickoff y `<Countdown />`.
+  - **Partidos en curso** (status `live` o ya iniciados sin finalizar): card simple sin marcador, indicando "En juego — resultado al finalizar".
+  - **Pronósticos del grupo**: para el partido seleccionado (próximo o en curso), si los pronósticos están cerrados (kickoff − 1h ya pasó), mostrar la tabla con `display_name` + `pred_a-pred_b`. Sin badges de puntos parciales.
+  - Si el partido está finalizado, mostrar marcador final + badges de puntos (3/1/0).
 
-- Crear el usuario en `auth.users` con email confirmado y password `Prueba123` usando una migración con `crypt()` / `gen_salt('bf')` (la función `handle_new_user` creará el `profile` automáticamente).
-- Forzar `display_name = 'Ignacio Paz'` y `status = 'approved'` en `profiles`.
-- Insertar `('user_id', 'admin')` en `user_roles`.
-- Verificar con un `SELECT` que el usuario quede como admin aprobado.
+### 3. Dashboard (`src/pages/Dashboard.tsx`)
+- En la card del próximo partido, cuando `isLive`:
+  - Cambiar texto "En vivo ahora" → **"En juego"**.
+  - Quitar la línea de marcador (`{score_a} - {score_b}`) y reemplazar por texto: *"Resultado al finalizar"*.
+  - Botón "Ver en vivo" → **"Ver en juego"** (sigue apuntando a `/live`).
 
-> Nota: la contraseña `Prueba123` quedará registrada en la migración. Te recomiendo cambiarla desde Profile después del primer login.
-
----
-
-## 2) Cargar partido Arsenal vs Atlético Madrid (UCL hoy)
-
-- Invocar la edge function `sync-live-matches` (que ya tiene lógica para detectar partidos UCL del día vía Football-Data y crearlos con `external_id`, banderas y `kickoff_at` reales).
-- Verificar en `matches` que el partido aparezca con `stage='UEFA Champions League'`, `status` correcto y banderas.
-- Si por algún motivo la API no lo devuelve hoy (rate-limit / fixture no listado), fallback: insertarlo a mano con `team_a='Arsenal FC'`, `team_b='Atlético de Madrid'`, banderas conocidas, `kickoff_at` del fixture real y `external_id=null` (modo manual, sin auto-sync).
-
----
-
-## 3) Crear 100 usuarios reales aprobados con predicciones
-
-Una sola migración SQL con bloque `DO $$ ... $$`:
-
-- Insertar 100 filas en `auth.users`:
-  - email: `loadtest+1@prode.test` … `loadtest+100@prode.test`
-  - password: `LoadTest123!` (hash bcrypt vía `crypt()`)
-  - `email_confirmed_at = now()` para que puedan loguearse sin verificar.
-  - `raw_user_meta_data = {"display_name": "LoadTest 001"}`.
-- El trigger `handle_new_user` les creará perfil + rol `user`.
-- `UPDATE profiles SET status='approved'` para los 100.
-- Insertar 1 predicción por usuario para el partido Arsenal vs Atleti con **distribución realista**:
-  - 60% marcadores 0–2 (0-0, 1-0, 0-1, 1-1, 2-1, 1-2, 2-0, 0-2, 2-2)
-  - 30% marcadores 2-3 goles totales (3-1, 1-3, 3-2, 2-3)
-  - 10% goleadas (3-0, 0-3, 4-1, 1-4, 4-0)
-- RLS no bloquea porque la migración corre como service role.
-
----
-
-## 4) Probar concurrencia con esos 100 usuarios
-
-Crear un script de carga local (no se sube como feature de la app, queda en `/scripts/loadtest.ts`) usando el SDK de Supabase:
-
-- Loguea N usuarios en paralelo (`signInWithPassword`).
-- Cada sesión abre un canal Realtime sobre `matches` y dispara queries periódicas a `matches`, `predictions`, `leaderboard` simulando la pestaña Live.
-- Logs por consola: latencia media, errores, throughput.
-- Parámetros configurables: `CONCURRENCY` (ej. 100), `DURATION_SEC`, `POLL_MS`.
-- Se ejecuta con `bun run scripts/loadtest.ts`.
-
-Esto te permite ver en tiempo real (en tu sesión admin) cómo responde la UI mientras los 100 usuarios consumen datos.
-
----
+### 4. Sincronización al finalizar (sin cambios de código)
+El edge function `sync-live-matches` ya:
+- Sincroniza partidos en estado `live` y `scheduled` próximos / pasados hasta 4h.
+- Actualiza `score_a`, `score_b`, `status` → `finished` cuando la API lo reporta.
+- El trigger DB `recalc_predictions_for_match` ya recalcula puntos automáticamente.
+- El cron existente (si está) sigue corriendo. **Verificación recomendada**: confirmar que hay un cron periódico invocando `sync-live-matches` cada N minutos para que los partidos finalicen sin intervención. Si no existe, agregarlo (cron cada 5 min).
 
 ## Detalles técnicos
 
-**Orden de ejecución (3 migraciones + 1 invocación + 1 archivo):**
+- Mantener la ruta `/live` para no romper enlaces existentes (Dashboard linkea ahí).
+- `useLiveMatches` se sigue usando: ya hace smart polling sin spam.
+- Quitar imports no usados tras la simplificación: `Loader2` solo si hace falta, `RefreshCw`, `useEffect` del auto-sync, `toast`, `subHours` (la lógica de "predsLocked" puede usar comparación simple `kickoff − 1h <= now`).
+- Mantener query `live-predictions` para tabla de pronósticos del grupo, pero sin `points` parciales en la UI (solo cuando `status === 'finished'`).
 
-1. Migración: crear admin `chueca@gmail.com`.
-2. Invocar edge function `sync-live-matches` para traer Arsenal vs Atleti.
-3. Migración: crear los 100 usuarios `loadtest+N@prode.test` aprobados.
-4. Migración: insertar las 100 predicciones (después de confirmar el `match.id` correcto).
-5. Crear `scripts/loadtest.ts` y `scripts/README.md` con instrucciones de uso.
-
-**Tablas tocadas:** `auth.users` (insert directo, password hasheada con bcrypt), `public.profiles` (update status), `public.user_roles` (insert admin), `public.predictions` (insert x100), `public.matches` (vía edge function o fallback manual).
-
-**Limpieza posterior:** te dejaré también un snippet SQL para borrar los 100 usuarios de prueba con `delete_user_completely()` cuando termines la prueba.
-
----
-
-## Riesgos / consideraciones
-
-- Insertar en `auth.users` directo es soportado pero sensible: lo haré con los campos exactos que usa Supabase Auth (`instance_id`, `aud='authenticated'`, `role='authenticated'`, `encrypted_password=crypt(...,gen_salt('bf'))`, `email_confirmed_at`, `raw_app_meta_data`, `raw_user_meta_data`).
-- Football-Data free tier: 10 req/min. La edge function ya lo respeta.
-- 100 sesiones concurrentes desde una sola máquina pueden saturar tu red local antes que Supabase; el script lo hará igual y reportará latencias reales del backend.
+## Pregunta abierta (opcional, podemos resolver al implementar)
+- ¿Confirmar si querés que también renombre el icono (de `Radio` a `Swords` / `Activity`) o lo dejo como está?
