@@ -13,7 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save, Lock, X } from "lucide-react";
+import { Loader2, Save, Lock, X, Pencil } from "lucide-react";
+import { MatchDetailsDialog } from "@/components/MatchDetailsDialog";
 import { toast } from "sonner";
 import { format, isAfter, subHours } from "date-fns";
 import { es } from "date-fns/locale";
