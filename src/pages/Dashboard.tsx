@@ -99,13 +99,19 @@ export default function Dashboard() {
       {nextMatches && nextMatches[0] && (() => {
         const featured = nextMatches[0];
         const isLive = featured.status === "live";
+        const multInfo = getMultiplierInfo(featured.team_a, featured.team_b, featured.stage);
         return (
           <Card className={isLive ? "border-destructive/50 bg-gradient-to-br from-destructive/10 to-transparent" : "border-primary/30 bg-gradient-to-br from-primary/10 to-transparent"}>
             <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="min-w-0">
-                <div className={`text-xs uppercase tracking-wider font-semibold mb-1 flex items-center gap-1 ${isLive ? "text-destructive" : "text-primary"}`}>
+                <div className={`text-xs uppercase tracking-wider font-semibold mb-1 flex items-center gap-2 ${isLive ? "text-destructive" : "text-primary"}`}>
                   <Radio className={`h-3 w-3 ${isLive ? "animate-pulse" : ""}`} />
                   {isLive ? "En juego" : "Próximo partido"}
+                  {multInfo && (
+                    <Badge className="gap-1 bg-amber-500 hover:bg-amber-500 text-white" title={multInfo.reasons.join(" + ")}>
+                      <Sparkles className="h-3 w-3" />{multInfo.label}
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-lg font-bold truncate">{featured.team_a} vs {featured.team_b}</div>
                 <div className="text-xs text-muted-foreground">
