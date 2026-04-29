@@ -9,6 +9,8 @@ import { Trophy, ListChecks, Calendar, Target, TrendingUp, Loader2, Radio } from
 import { Countdown } from "@/components/Countdown";
 import { formatAR } from "@/lib/datetime";
 import { TournamentRules } from "@/components/TournamentRules";
+import { getMultiplierInfo } from "@/lib/scoring";
+import { Sparkles } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
