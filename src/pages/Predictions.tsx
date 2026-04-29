@@ -268,6 +268,7 @@ export default function Predictions() {
                   <MatchCard
                     key={m.id}
                     match={matchWithFlags}
+                    window={m.prediction_window_id ? windowMap.get(m.prediction_window_id) : undefined}
                     prediction={predMap.get(m.id)}
                     onSaved={() => qc.invalidateQueries({ queryKey: ["my-preds"] })}
                   />
