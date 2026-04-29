@@ -435,11 +435,6 @@ export default function Ranking() {
                       {deltaIcon && <span className="mt-0.5">{deltaIcon}</span>}
                     </div>
 
-                    <Avatar className="h-9 w-9 shrink-0">
-                      {row.avatar_url && <AvatarImage src={row.avatar_url} alt={row.display_name} />}
-                      <AvatarFallback className="text-xs">{initials(row.display_name)}</AvatarFallback>
-                    </Avatar>
-
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-medium text-sm truncate">{row.display_name}</span>
