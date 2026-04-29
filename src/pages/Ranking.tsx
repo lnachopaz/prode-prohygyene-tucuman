@@ -118,6 +118,8 @@ export default function Ranking() {
   // Server-side leaderboard (1 row per user, no row limit issue) → used for "all" mode
   const { data: leaderboard, isLoading: lLb } = useQuery({
     queryKey: ["ranking-leaderboard"],
+    refetchOnMount: "always",
+    staleTime: 0,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("leaderboard")
