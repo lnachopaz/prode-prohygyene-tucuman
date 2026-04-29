@@ -562,30 +562,27 @@ function ExportRanking() {
   const [busy, setBusy] = useState<"csv" | "pdf" | null>(null);
 
   async function loadRanking() {
-    const { data: profiles, error: pErr } = await supabase.from("profiles").select("id, display_name").eq("status", "approved");
-    if (pErr) throw pErr;
-    const { data: matches, error: mErr } = await supabase.from("matches").select("id, status, score_a, score_b");
-    if (mErr) throw mErr;
-    const { data: preds, error: prErr } = await supabase.from("predictions").select("user_id, match_id, pred_a, pred_b, points");
-    if (prErr) throw prErr;
-
-    const finishedIds = new Set((matches ?? []).filter((m: any) => m.status === "finished").map((m: any) => m.id));
-    const rows = (profiles ?? []).map((p: any) => {
-      const mine = (preds ?? []).filter((x: any) => x.user_id === p.id && finishedIds.has(x.match_id));
-      const total = mine.reduce((s, x) => s + (x.points ?? 0), 0);
-      const exact = mine.filter((x) => x.points === 3).length;
-      const result = mine.filter((x) => x.points === 1).length;
+    // Use server-side leaderboard view (1 row per user) → no 1000-row limit issue.
+    const { data: lb, error: lbErr } = await supabase
+      .from("leaderboard")
+      .select("user_id, display_name, total_points, exact_hits, result_hits, predictions_count")
+      .order("total_points", { ascending: false })
+      .order("exact_hits", { ascending: false });
+    if (lbErr) throw lbErr;
+    const rows = (lb ?? []).map((r: any, i: number) => {
+      const played = r.predictions_count || 0;
+      const total = r.total_points || 0;
       return {
-        name: p.display_name,
+        pos: i + 1,
+        name: r.display_name,
         points: total,
-        played: mine.length,
-        exact,
-        result,
-        avg: mine.length ? (total / mine.length).toFixed(2) : "0.00",
+        played,
+        exact: r.exact_hits || 0,
+        result: r.result_hits || 0,
+        avg: played ? (total / played).toFixed(2) : "0.00",
       };
     });
-    rows.sort((a, b) => b.points - a.points);
-    return rows.map((r, i) => ({ pos: i + 1, ...r }));
+    return rows;
   }
 
   async function exportCSV() {
