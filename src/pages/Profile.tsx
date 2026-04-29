@@ -18,6 +18,27 @@ export default function Profile() {
   const { user, isAdmin } = useAuth();
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+
+  async function handleExport(kind: "csv" | "pdf") {
+    if (!user) return;
+    setExporting(kind);
+    try {
+      const rows = await fetchUserPredictions(user.id);
+      if (rows.length === 0) {
+        toast.info("Todavía no tenés pronósticos cargados");
+        return;
+      }
+      const name = profile?.display_name || user.email || "usuario";
+      if (kind === "csv") exportUserPredictionsCSV(name, rows);
+      else exportUserPredictionsPDF(name, rows);
+      toast.success(`${kind.toUpperCase()} descargado`);
+    } catch (e: any) {
+      toast.error(e.message ?? "No se pudo exportar");
+    } finally {
+      setExporting(null);
+    }
+  }
 
   const { data: profile, refetch } = useQuery({
     queryKey: ["profile", user?.id],
