@@ -148,6 +148,8 @@ export default function Ranking() {
   });
 
   const { data: profiles, isLoading: l2 } = useQuery({
+    refetchOnMount: "always",
+    staleTime: 0,
     queryKey: ["ranking-profiles"],
     queryFn: async () => {
       const { data, error } = await supabase.from("profiles").select("id, display_name, avatar_url");
