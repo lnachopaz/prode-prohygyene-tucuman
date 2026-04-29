@@ -420,10 +420,25 @@ function MatchCard({
         )}
 
         {!locked && (
-          <Button size="sm" className="w-full" onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Guardar pronóstico
+          <Button
+            size="sm"
+            className={`w-full ${prediction ? "bg-warning text-warning-foreground hover:bg-warning/90" : ""}`}
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : prediction ? (
+              <Pencil className="h-4 w-4 mr-2" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            {prediction ? "Editar pronóstico" : "Guardar pronóstico"}
           </Button>
+        )}
+
+        {match.status === "finished" && (
+          <MatchDetailsDialog match={match} />
         )}
       </CardContent>
     </Card>
