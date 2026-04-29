@@ -355,13 +355,6 @@ export default function Ranking() {
         </Card>
       )}
 
-      {/* Global stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <StatBox icon={<Calendar className="h-3.5 w-3.5" />} label="Partidos" value={`${matchStats?.finished ?? 0}/${matchStats?.total ?? 0}`} />
-        <StatBox icon={<Users className="h-3.5 w-3.5" />} label="Jugadores" value={globalStats.players} />
-        <StatBox icon={<Target className="h-3.5 w-3.5" />} label="Plenos totales" value={globalStats.totalExact} />
-        <StatBox icon={<TrendingUp className="h-3.5 w-3.5" />} label="Pronósticos" value={globalStats.totalPreds.toLocaleString()} />
-      </div>
 
       {/* Best per stage */}
       <Card>
