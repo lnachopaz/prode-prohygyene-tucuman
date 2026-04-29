@@ -96,8 +96,8 @@ async function main() {
   const stopAt = Date.now() + DURATION_SEC * 1000;
   const tasks: Promise<void>[] = [];
   // Login en batches para evitar rate-limit de auth (max ~30 logins/seg)
-  const BATCH = 20;
-  const BATCH_DELAY_MS = 1500;
+  const BATCH = 10;
+  const BATCH_DELAY_MS = 4000;
   for (let i = 1; i <= CONCURRENCY; i++) {
     tasks.push(runUser(i, stopAt));
     if (i % BATCH === 0) {
