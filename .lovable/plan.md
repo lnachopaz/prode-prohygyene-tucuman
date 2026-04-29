@@ -1,112 +1,79 @@
-# Vista Live de partidos — arquitectura de alto rendimiento
-
 ## Objetivo
 
-Garantizar que toda la información de partidos en la UI venga **exclusivamente** de Supabase (tabla `matches`), con polling inteligente y caché eficiente vía React Query.
+Preparar el entorno para una prueba de carga real con 100 usuarios concurrentes prediciendo Arsenal vs Atlético de Madrid (UCL hoy), y dejar tu cuenta `chueca@gmail.com` (Ignacio Paz) como administradora.
 
-## Estado actual
+---
 
-- ✅ El frontend ya consume Supabase únicamente. La única llamada a football-data está en el edge function `sync-live-matches` (servidor), lo cual respeta la regla de oro.
-- ⚠️ `src/pages/Live.tsx` hace polling fijo de 30s, no diferencia entre "hay partido en vivo" o no.
-- ⚠️ No hay `staleTime`, así que cambiar de pestaña refetchea aunque los datos sean frescos.
-- ⚠️ La lógica de fetch está inline en el componente, no reutilizable.
+## 1) Crear admin `chueca@gmail.com` — Ignacio Paz
 
-## Aclaración sobre el esquema
+- Crear el usuario en `auth.users` con email confirmado y password `Prueba123` usando una migración con `crypt()` / `gen_salt('bf')` (la función `handle_new_user` creará el `profile` automáticamente).
+- Forzar `display_name = 'Ignacio Paz'` y `status = 'approved'` en `profiles`.
+- Insertar `('user_id', 'admin')` en `user_roles`.
+- Verificar con un `SELECT` que el usuario quede como admin aprobado.
 
-La tabla real es `matches` con estas columnas (no las que mencionás en el prompt):
+> Nota: la contraseña `Prueba123` quedará registrada en la migración. Te recomiendo cambiarla desde Profile después del primer login.
 
-- `team_a`, `team_b` (no `home_team`/`away_team`)
-- `score_a`, `score_b`
-- `status` enum: `scheduled` | `live` | `finished` (equivalente a `TIMED`/`IN_PLAY`/`FINISHED`)
-- `updated_at` (equivalente a `last_updated`)
-- + `kickoff_at`, `stage`, banderas, etc.
+---
 
-Voy a respetar el esquema real y exponer un tipo `Match` claro en TS.
+## 2) Cargar partido Arsenal vs Atlético Madrid (UCL hoy)
 
-## Cambios
+- Invocar la edge function `sync-live-matches` (que ya tiene lógica para detectar partidos UCL del día vía Football-Data y crearlos con `external_id`, banderas y `kickoff_at` reales).
+- Verificar en `matches` que el partido aparezca con `stage='UEFA Champions League'`, `status` correcto y banderas.
+- Si por algún motivo la API no lo devuelve hoy (rate-limit / fixture no listado), fallback: insertarlo a mano con `team_a='Arsenal FC'`, `team_b='Atlético de Madrid'`, banderas conocidas, `kickoff_at` del fixture real y `external_id=null` (modo manual, sin auto-sync).
 
-### 1. Nuevo servicio `src/lib/matchesService.ts`
+---
 
-Función única `fetchMatches()` que consulta Supabase:
+## 3) Crear 100 usuarios reales aprobados con predicciones
 
-- `select("*").order("kickoff_at")`
-- Devuelve `Match[]` tipado.
-- Helper `hasLiveMatch(matches)` para decidir el intervalo.
+Una sola migración SQL con bloque `DO $$ ... $$`:
 
-### 2. Nuevo hook `src/hooks/useLiveMatches.ts`
+- Insertar 100 filas en `auth.users`:
+  - email: `loadtest+1@prode.test` … `loadtest+100@prode.test`
+  - password: `LoadTest123!` (hash bcrypt vía `crypt()`)
+  - `email_confirmed_at = now()` para que puedan loguearse sin verificar.
+  - `raw_user_meta_data = {"display_name": "LoadTest 001"}`.
+- El trigger `handle_new_user` les creará perfil + rol `user`.
+- `UPDATE profiles SET status='approved'` para los 100.
+- Insertar 1 predicción por usuario para el partido Arsenal vs Atleti con **distribución realista**:
+  - 60% marcadores 0–2 (0-0, 1-0, 0-1, 1-1, 2-1, 1-2, 2-0, 0-2, 2-2)
+  - 30% marcadores 2-3 goles totales (3-1, 1-3, 3-2, 2-3)
+  - 10% goleadas (3-0, 0-3, 4-1, 1-4, 4-0)
+- RLS no bloquea porque la migración corre como service role.
 
-Encapsula la query con **smart polling**:
+---
 
-- `queryKey: ["matches", "live-feed"]`
-- `staleTime: 30_000` → no refetch si los datos tienen menos de 30s (cubre navegación entre tabs).
-- `refetchInterval`: función dinámica basada en los datos actuales:
-  - Si algún match tiene `status === 'live'` → **60_000 ms**
-  - Si no → **300_000 ms**
-- `refetchOnWindowFocus: false` para no romper el smart polling.
-- `gcTime: 5 * 60_000` para retener en caché tras desmontar.
+## 4) Probar concurrencia con esos 100 usuarios
 
-### 3. Refactor de `src/pages/Live.tsx`
+Crear un script de carga local (no se sube como feature de la app, queda en `/scripts/loadtest.ts`) usando el SDK de Supabase:
 
-- Reemplazar el `useQuery` inline por `useLiveMatches()`.
-- Mantener el resto de la UI (selector multi-partido, pronósticos del grupo, mi pronóstico, countdown).
-- Las queries secundarias (`live-predictions`, `live-my-pred`) también pasan a `staleTime: 30_000` y un `refetchInterval` que sigue la misma lógica (60s si live, 5 min si no).
+- Loguea N usuarios en paralelo (`signInWithPassword`).
+- Cada sesión abre un canal Realtime sobre `matches` y dispara queries periódicas a `matches`, `predictions`, `leaderboard` simulando la pestaña Live.
+- Logs por consola: latencia media, errores, throughput.
+- Parámetros configurables: `CONCURRENCY` (ej. 100), `DURATION_SEC`, `POLL_MS`.
+- Se ejecuta con `bun run scripts/loadtest.ts`.
 
-### 4. Sin cambios en `App.tsx`
+Esto te permite ver en tiempo real (en tu sesión admin) cómo responde la UI mientras los 100 usuarios consumen datos.
 
-El `QueryClient` global se mantiene; los defaults se setean por query para no afectar otras pantallas.
+---
 
 ## Detalles técnicos
 
-```ts
-// src/lib/matchesService.ts
-import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
+**Orden de ejecución (3 migraciones + 1 invocación + 1 archivo):**
 
-export type Match = Database["public"]["Tables"]["matches"]["Row"];
+1. Migración: crear admin `chueca@gmail.com`.
+2. Invocar edge function `sync-live-matches` para traer Arsenal vs Atleti.
+3. Migración: crear los 100 usuarios `loadtest+N@prode.test` aprobados.
+4. Migración: insertar las 100 predicciones (después de confirmar el `match.id` correcto).
+5. Crear `scripts/loadtest.ts` y `scripts/README.md` con instrucciones de uso.
 
-export async function fetchMatches(): Promise<Match[]> {
-  const { data, error } = await supabase
-    .from("matches")
-    .select("*")
-    .order("kickoff_at", { ascending: true });
-  if (error) throw error;
-  return data ?? [];
-}
+**Tablas tocadas:** `auth.users` (insert directo, password hasheada con bcrypt), `public.profiles` (update status), `public.user_roles` (insert admin), `public.predictions` (insert x100), `public.matches` (vía edge function o fallback manual).
 
-export const hasLiveMatch = (matches: Match[] | undefined) =>
-  !!matches?.some((m) => m.status === "live");
-```
+**Limpieza posterior:** te dejaré también un snippet SQL para borrar los 100 usuarios de prueba con `delete_user_completely()` cuando termines la prueba.
 
-```ts
-// src/hooks/useLiveMatches.ts
-import { useQuery } from "@tanstack/react-query";
-import { fetchMatches, hasLiveMatch, type Match } from "@/lib/matchesService";
+---
 
-const LIVE_INTERVAL = 60_000;     // 1 min cuando hay partido en vivo
-const IDLE_INTERVAL = 300_000;    // 5 min cuando no
+## Riesgos / consideraciones
 
-export function useLiveMatches() {
-  return useQuery<Match[]>({
-    queryKey: ["matches", "live-feed"],
-    queryFn: fetchMatches,
-    staleTime: 30_000,
-    gcTime: 5 * 60_000,
-    refetchOnWindowFocus: false,
-    refetchInterval: (query) =>
-      hasLiveMatch(query.state.data) ? LIVE_INTERVAL : IDLE_INTERVAL,
-  });
-}
-```
-
-## Archivos afectados
-
-- ➕ `src/lib/matchesService.ts`
-- ➕ `src/hooks/useLiveMatches.ts`
-- ✏️ `src/pages/Live.tsx` (refactor: usar el hook, ajustar `staleTime` en queries secundarias)
-
-## Lo que NO se toca
-
-- `App.tsx` y el `QueryClient` global.
-- Otras páginas (`Dashboard`, `Predictions`, `Admin`, `Ranking`).
-- Edge functions (siguen siendo el único punto que habla con football-data).
-- Esquema de la base de datos.
+- Insertar en `auth.users` directo es soportado pero sensible: lo haré con los campos exactos que usa Supabase Auth (`instance_id`, `aud='authenticated'`, `role='authenticated'`, `encrypted_password=crypt(...,gen_salt('bf'))`, `email_confirmed_at`, `raw_app_meta_data`, `raw_user_meta_data`).
+- Football-Data free tier: 10 req/min. La edge function ya lo respeta.
+- 100 sesiones concurrentes desde una sola máquina pueden saturar tu red local antes que Supabase; el script lo hará igual y reportará latencias reales del backend.
