@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { format, isAfter, subHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
+import { formatAR } from "@/lib/datetime";
 
 type Match = {
   id: string;
