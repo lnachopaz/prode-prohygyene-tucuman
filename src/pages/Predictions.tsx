@@ -80,6 +80,24 @@ export default function Predictions() {
     },
   });
 
+  const { data: windows } = useQuery({
+    queryKey: ["prediction-windows"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("prediction_windows")
+        .select("*")
+        .order("sort_order");
+      if (error) throw error;
+      return data as PredictionWindow[];
+    },
+  });
+
+  const windowMap = useMemo(() => {
+    const m = new Map<string, PredictionWindow>();
+    windows?.forEach((w) => m.set(w.id, w));
+    return m;
+  }, [windows]);
+
   const predMap = useMemo(() => {
     const m = new Map<string, Prediction>();
     preds?.forEach((p) => m.set(p.match_id, p));
