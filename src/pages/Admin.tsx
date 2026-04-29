@@ -218,7 +218,7 @@ function NewMatchDialog({ onCreated }: { onCreated: () => void }) {
     setBusy(true);
     const { error } = await supabase.from("matches").insert({
       team_a: teamA, team_b: teamB,
-      kickoff_at: new Date(kickoff).toISOString(),
+      kickoff_at: arLocalInputToUTC(kickoff).toISOString(),
       stage, group_name: groupName || null,
     });
     setBusy(false);
