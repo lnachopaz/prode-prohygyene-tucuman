@@ -26,12 +26,13 @@ const stats: Stats = { ok: 0, err: 0, latencies: [], errors: [] };
 
 async function loadOpenMatches(): Promise<string[]> {
   const c = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  // Login con un usuario aprobado para poder leer matches con RLS
   await c.auth.signInWithPassword({ email: "loadtest+1@prode.test", password: PASSWORD });
+  // Solo partidos sin ventana de fechas (test) o con ventana abierta + kickoff > now+1h
   const { data, error } = await c
     .from("matches")
-    .select("id, team_a, team_b, kickoff_at")
+    .select("id, kickoff_at, prediction_window_id")
     .gt("kickoff_at", new Date(Date.now() + 65 * 60 * 1000).toISOString())
+    .is("prediction_window_id", null)
     .order("kickoff_at")
     .limit(MATCHES_PER);
   if (error) console.error("loadOpenMatches:", error.message);
