@@ -7,12 +7,38 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, FileDown, FileText } from "lucide-react";
+import {
+  fetchUserPredictions,
+  exportUserPredictionsCSV,
+  exportUserPredictionsPDF,
+} from "@/lib/predictionsExport";
 
 export default function Profile() {
   const { user, isAdmin } = useAuth();
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+
+  async function handleExport(kind: "csv" | "pdf") {
+    if (!user) return;
+    setExporting(kind);
+    try {
+      const rows = await fetchUserPredictions(user.id);
+      if (rows.length === 0) {
+        toast.info("Todavía no tenés pronósticos cargados");
+        return;
+      }
+      const name = profile?.display_name || user.email || "usuario";
+      if (kind === "csv") exportUserPredictionsCSV(name, rows);
+      else exportUserPredictionsPDF(name, rows);
+      toast.success(`${kind.toUpperCase()} descargado`);
+    } catch (e: any) {
+      toast.error(e.message ?? "No se pudo exportar");
+    } finally {
+      setExporting(null);
+    }
+  }
 
   const { data: profile, refetch } = useQuery({
     queryKey: ["profile", user?.id],
@@ -95,6 +121,29 @@ export default function Profile() {
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Guardar
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileDown className="h-5 w-5" /> Backup de mis pronósticos
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Descargá una copia de todos tus pronósticos con el resultado real y los puntos obtenidos.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => handleExport("csv")} disabled={exporting !== null}>
+              {exporting === "csv" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+              Descargar CSV
+            </Button>
+            <Button variant="outline" onClick={() => handleExport("pdf")} disabled={exporting !== null}>
+              {exporting === "pdf" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+              Descargar PDF
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

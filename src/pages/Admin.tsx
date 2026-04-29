@@ -555,7 +555,57 @@ function SyncAdmin() {
       </Card>
 
       <ExportRanking />
+      <BackupAllPredictions />
     </div>
+  );
+}
+
+function BackupAllPredictions() {
+  const [busy, setBusy] = useState<"csv" | "pdf" | null>(null);
+
+  async function run(kind: "csv" | "pdf") {
+    setBusy(kind);
+    try {
+      const mod = await import("@/lib/predictionsExport");
+      const { rows, displayNameById } = await mod.fetchAllPredictionsWithProfiles();
+      if (rows.length === 0) {
+        toast.info("Aún no hay pronósticos cargados");
+        return;
+      }
+      if (kind === "csv") mod.exportAllPredictionsCSV(rows, displayNameById);
+      else mod.exportAllPredictionsPDF(rows, displayNameById);
+      toast.success(`Backup ${kind.toUpperCase()} descargado (${rows.length} registros)`);
+    } catch (e: any) {
+      toast.error(e.message ?? "No se pudo generar el backup");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <FileDown className="h-4 w-4" /> Backup completo de pronósticos
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <p className="text-sm text-muted-foreground">
+          Descarga todos los pronósticos de todos los usuarios con el resultado real y los puntos obtenidos.
+          Útil como copia de seguridad antes/después de cada fecha.
+        </p>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => run("csv")} disabled={busy !== null}>
+            {busy === "csv" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+            Backup CSV
+          </Button>
+          <Button variant="outline" onClick={() => run("pdf")} disabled={busy !== null}>
+            {busy === "pdf" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+            Backup PDF
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
