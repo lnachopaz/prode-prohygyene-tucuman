@@ -983,7 +983,7 @@ function PredictionsAdmin() {
       const m = r.match;
       const realScore = m.score_a != null && m.score_b != null ? `${m.score_a}-${m.score_b}` : "—";
       lines.push([
-        format(new Date(m.kickoff_at), "yyyy-MM-dd HH:mm"),
+        formatAR(m.kickoff_at, "yyyy-MM-dd HH:mm"),
         `"${m.stage}"`,
         m.group_name ?? "",
         `"${m.team_a} vs ${m.team_b}"`,
