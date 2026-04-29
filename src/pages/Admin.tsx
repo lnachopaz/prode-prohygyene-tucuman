@@ -15,6 +15,7 @@ import { Loader2, RefreshCw, Save, Plus, Trash2, Calculator, Lock, MailCheck, Fi
 import { fetchAllPaginated } from "@/lib/fetchAll";
 import { format, formatDistanceStrict } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatAR } from "@/lib/datetime";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
