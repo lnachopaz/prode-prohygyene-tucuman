@@ -82,10 +82,15 @@ export default function Live() {
   const started = liveMatch ? (liveMatch.isLive || new Date(liveMatch.match.kickoff_at) <= new Date()) : false;
   const predsLocked = liveMatch ? subHours(new Date(liveMatch.match.kickoff_at), 1) <= new Date() : false;
 
+  const isLiveNow = !!liveMatch?.isLive;
+  const secondaryInterval = isLiveNow ? LIVE_INTERVAL_MS : IDLE_INTERVAL_MS;
+
   const { data: predictions } = useQuery({
     queryKey: ["live-predictions", matchId, predsLocked],
     enabled: !!matchId && predsLocked,
-    refetchInterval: 30_000,
+    staleTime: MATCHES_STALE_TIME_MS,
+    refetchOnWindowFocus: false,
+    refetchInterval: secondaryInterval,
     queryFn: async () => {
       const { data: preds } = await supabase
         .from("predictions")
