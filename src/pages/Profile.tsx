@@ -147,6 +147,8 @@ export default function Profile() {
           </div>
         </CardContent>
       </Card>
+
+      <TournamentRules />
     </div>
   );
 }
