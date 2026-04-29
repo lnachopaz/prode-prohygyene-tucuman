@@ -15,6 +15,7 @@ import { Loader2, RefreshCw, Save, Plus, Trash2, Calculator, Lock, MailCheck, Fi
 import { fetchAllPaginated } from "@/lib/fetchAll";
 import { format, formatDistanceStrict } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatAR, arLocalInputToUTC } from "@/lib/datetime";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -156,7 +157,7 @@ function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-center">
           <div>
             <div className="text-xs text-muted-foreground">
-              {format(new Date(match.kickoff_at), "dd/MM HH:mm")} · {match.stage}
+              {formatAR(match.kickoff_at, "dd/MM HH:mm")} · {match.stage}
               {match.group_name ? ` · ${match.group_name}` : ""}
             </div>
             <div className="font-semibold">{match.team_a} vs {match.team_b}</div>
@@ -217,7 +218,7 @@ function NewMatchDialog({ onCreated }: { onCreated: () => void }) {
     setBusy(true);
     const { error } = await supabase.from("matches").insert({
       team_a: teamA, team_b: teamB,
-      kickoff_at: new Date(kickoff).toISOString(),
+      kickoff_at: arLocalInputToUTC(kickoff).toISOString(),
       stage, group_name: groupName || null,
     });
     setBusy(false);
@@ -844,7 +845,7 @@ function TestModeAdmin() {
             <Card key={m.id}>
               <CardContent className="p-3 flex flex-wrap items-center gap-2">
                 <div className="flex-1 min-w-[200px]">
-                  <div className="text-xs text-muted-foreground">{format(new Date(m.kickoff_at), "dd/MM HH:mm")}</div>
+                  <div className="text-xs text-muted-foreground">{formatAR(m.kickoff_at, "dd/MM HH:mm")}</div>
                   <div className="font-medium flex items-center gap-2">
                     {m.team_a} vs {m.team_b}
                     {m.test_mode && (
@@ -982,7 +983,7 @@ function PredictionsAdmin() {
       const m = r.match;
       const realScore = m.score_a != null && m.score_b != null ? `${m.score_a}-${m.score_b}` : "—";
       lines.push([
-        format(new Date(m.kickoff_at), "yyyy-MM-dd HH:mm"),
+        formatAR(m.kickoff_at, "yyyy-MM-dd HH:mm"),
         `"${m.stage}"`,
         m.group_name ?? "",
         `"${m.team_a} vs ${m.team_b}"`,
@@ -1084,7 +1085,7 @@ function PredictionsAdmin() {
                     return (
                       <div key={r.id} className="grid grid-cols-[120px_1fr_70px_70px_60px] gap-2 px-3 py-2 items-center text-sm">
                         <div className="text-xs text-muted-foreground">
-                          <div>{format(new Date(m.kickoff_at), "dd/MM HH:mm")}</div>
+                          <div>{formatAR(m.kickoff_at, "dd/MM HH:mm")}</div>
                           <div className="text-[10px]">{m.stage}</div>
                         </div>
                         <div className="font-medium truncate">{m.team_a} vs {m.team_b}</div>

@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, Radio, Clock, Trophy, RefreshCw } from "lucide-react";
-import { format, subHours } from "date-fns";
-import { es } from "date-fns/locale";
+import { subHours } from "date-fns";
+import { formatAR } from "@/lib/datetime";
 import { Countdown } from "@/components/Countdown";
 import {
   useLiveMatches,
@@ -198,7 +198,7 @@ export default function Live() {
                 <div className="text-2xl font-bold text-muted-foreground">vs</div>
               )}
               <div className="text-xs text-muted-foreground mt-1">
-                {format(new Date(m.kickoff_at), "dd MMM · HH:mm", { locale: es })}
+                {formatAR(m.kickoff_at, "dd MMM · HH:mm 'hs'")}
               </div>
             </div>
             <div className="text-center flex flex-col items-center gap-2">
