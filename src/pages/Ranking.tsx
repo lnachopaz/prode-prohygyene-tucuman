@@ -355,13 +355,6 @@ export default function Ranking() {
         </Card>
       )}
 
-      {/* Global stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <StatBox icon={<Calendar className="h-3.5 w-3.5" />} label="Partidos" value={`${matchStats?.finished ?? 0}/${matchStats?.total ?? 0}`} />
-        <StatBox icon={<Users className="h-3.5 w-3.5" />} label="Jugadores" value={globalStats.players} />
-        <StatBox icon={<Target className="h-3.5 w-3.5" />} label="Plenos totales" value={globalStats.totalExact} />
-        <StatBox icon={<TrendingUp className="h-3.5 w-3.5" />} label="Pronósticos" value={globalStats.totalPreds.toLocaleString()} />
-      </div>
 
       {/* Best per stage */}
       <Card>
@@ -442,11 +435,6 @@ export default function Ranking() {
                       {deltaIcon && <span className="mt-0.5">{deltaIcon}</span>}
                     </div>
 
-                    <Avatar className="h-9 w-9 shrink-0">
-                      {row.avatar_url && <AvatarImage src={row.avatar_url} alt={row.display_name} />}
-                      <AvatarFallback className="text-xs">{initials(row.display_name)}</AvatarFallback>
-                    </Avatar>
-
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-medium text-sm truncate">{row.display_name}</span>
@@ -484,10 +472,6 @@ export default function Ranking() {
                     </span>
                     <span>{deltaIcon}</span>
                     <span className="font-medium truncate flex items-center gap-2 min-w-0">
-                      <Avatar className="h-7 w-7 shrink-0">
-                        {row.avatar_url && <AvatarImage src={row.avatar_url} alt={row.display_name} />}
-                        <AvatarFallback className="text-[10px]">{initials(row.display_name)}</AvatarFallback>
-                      </Avatar>
                       <span className="truncate">{row.display_name}</span>
                       {isMe && <span className="text-xs text-primary">(vos)</span>}
                     </span>
