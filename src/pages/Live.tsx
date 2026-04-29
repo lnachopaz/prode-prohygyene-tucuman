@@ -1,11 +1,11 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Radio, Clock, Trophy, RefreshCw } from "lucide-react";
-import { subHours } from "date-fns";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Radio, Clock, Trophy, Info } from "lucide-react";
 import { formatAR } from "@/lib/datetime";
 import { Countdown } from "@/components/Countdown";
 import {
@@ -14,76 +14,37 @@ import {
   IDLE_INTERVAL_MS,
   MATCHES_STALE_TIME_MS,
 } from "@/hooks/useLiveMatches";
-
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-
-function calcPoints(pa: number, pb: number, sa: number | null, sb: number | null) {
-  if (sa === null || sb === null) return 0;
-  if (pa === sa && pb === sb) return 3;
-  if (Math.sign(pa - pb) === Math.sign(sa - sb)) return 1;
-  return 0;
-}
+import { useState } from "react";
 
 export default function Live() {
-  const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [syncing, setSyncing] = useState(false);
-
-  const syncLive = async (silent = false) => {
-    setSyncing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("sync-live-matches");
-      if (error) throw error;
-      await queryClient.invalidateQueries({ queryKey: ["matches", "live-feed"] });
-      if (!silent) toast.success(`Marcadores actualizados (${data?.updated ?? 0})`);
-    } catch (e: any) {
-      if (!silent) toast.error("Error sincronizando: " + (e?.message ?? "desconocido"));
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  // Auto-sync al montar y cada 30s
-  useEffect(() => {
-    syncLive(true);
-    const id = setInterval(() => syncLive(true), 30_000);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const [selectedIdx, setSelectedIdx] = useState(0);
 
-  // Partidos en vivo (puede haber varios simultáneos) + fallback al próximo
-  // Lista completa de matches con smart polling (solo desde Supabase).
   const { data: allMatches, isLoading } = useLiveMatches();
 
-  // Derivamos partidos en vivo / próximo desde el cache local — sin más fetches.
+  // Derivar partidos en curso / próximo desde el cache (sin llamadas extra)
   const liveData = (() => {
     if (!allMatches) return null;
     const now = new Date();
-    const lives = allMatches.filter((m) => m.status === "live");
-    if (lives.length > 0) return { matches: lives, isLive: true };
     const ongoing = allMatches.filter(
       (m) => new Date(m.kickoff_at) <= now && m.status !== "finished",
     );
     if (ongoing.length > 0) return { matches: ongoing, isLive: true };
     const next = allMatches.find(
-      (m) => new Date(m.kickoff_at) > now && m.status === "scheduled",
+      (m) => new Date(m.kickoff_at) > now && m.status !== "finished",
     );
     return next ? { matches: [next], isLive: false } : null;
   })();
 
   const matches = liveData?.matches ?? [];
   const safeIdx = Math.min(selectedIdx, Math.max(0, matches.length - 1));
-  const liveMatch = liveData ? { match: matches[safeIdx], isLive: liveData.isLive } : null;
+  const current = liveData ? { match: matches[safeIdx], isLive: liveData.isLive } : null;
 
-  const matchId = liveMatch?.match?.id;
-  const started = liveMatch ? (liveMatch.isLive || new Date(liveMatch.match.kickoff_at) <= new Date()) : false;
-  const predsLocked = liveMatch ? subHours(new Date(liveMatch.match.kickoff_at), 1) <= new Date() : false;
-
-  const isLiveNow = !!liveMatch?.isLive;
-  const secondaryInterval = isLiveNow ? LIVE_INTERVAL_MS : IDLE_INTERVAL_MS;
+  const matchId = current?.match?.id;
+  const kickoff = current ? new Date(current.match.kickoff_at) : null;
+  const predsLocked = kickoff ? (kickoff.getTime() - 60 * 60 * 1000) <= Date.now() : false;
+  const isFinished = current?.match?.status === "finished";
+  const secondaryInterval = current?.isLive ? LIVE_INTERVAL_MS : IDLE_INTERVAL_MS;
 
   const { data: predictions } = useQuery({
     queryKey: ["live-predictions", matchId, predsLocked],
@@ -102,20 +63,24 @@ export default function Live() {
         .from("profiles")
         .select("id, display_name")
         .in("id", ids);
-      return preds.map((p) => ({
-        ...p,
-        display_name: profiles?.find((pr) => pr.id === p.user_id)?.display_name ?? "—",
-      })).sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
+      return preds
+        .map((p) => ({
+          ...p,
+          display_name: profiles?.find((pr) => pr.id === p.user_id)?.display_name ?? "—",
+        }))
+        .sort((a, b) => {
+          // Orden alfabético si no hay puntos aún; por puntos si finalizó
+          if (isFinished) return (b.points ?? 0) - (a.points ?? 0);
+          return a.display_name.localeCompare(b.display_name);
+        });
     },
   });
 
-  // Mi pronóstico para el partido en vivo
   const { data: myPred } = useQuery({
     queryKey: ["live-my-pred", matchId, user?.id],
     enabled: !!matchId && !!user,
     staleTime: MATCHES_STALE_TIME_MS,
     refetchOnWindowFocus: false,
-    refetchInterval: secondaryInterval,
     queryFn: async () => {
       const { data } = await supabase
         .from("predictions")
@@ -131,29 +96,35 @@ export default function Live() {
     return <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
 
-  if (!liveMatch) {
+  if (!current) {
     return (
       <div className="space-y-4">
-        <h1 className="text-3xl font-bold">Live</h1>
+        <h1 className="text-3xl font-bold">En juego</h1>
         <Card><CardContent className="p-8 text-center text-muted-foreground">No hay partidos próximos.</CardContent></Card>
       </div>
     );
   }
 
-  const m = liveMatch.match;
+  const m = current.match;
+  const started = current.isLive;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Radio className="h-7 w-7 text-primary" /> Live
-          </h1>
-          <p className="text-muted-foreground">Seguí el partido en vivo y los pronósticos del grupo.</p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Radio className="h-7 w-7 text-primary" /> En juego
+        </h1>
+        <p className="text-muted-foreground">Seguí los partidos y los pronósticos del grupo.</p>
       </div>
 
-      {/* Selector cuando hay varios partidos en vivo */}
+      <Alert className="border-primary/30 bg-primary/5">
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          Los marcadores se actualizan <strong>al finalizar cada partido</strong>. Los pronósticos del grupo se muestran una vez cerrada la ventana (1 hora antes del inicio).
+        </AlertDescription>
+      </Alert>
+
+      {/* Selector cuando hay varios partidos en curso */}
       {matches.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {matches.map((mt, i) => (
@@ -164,8 +135,8 @@ export default function Live() {
               onClick={() => setSelectedIdx(i)}
               className="gap-2"
             >
-              {liveData?.isLive && <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />}
-              <span className="tabular-nums">{mt.team_a} {mt.score_a ?? 0} - {mt.score_b ?? 0} {mt.team_b}</span>
+              {current.isLive && <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />}
+              <span>{mt.team_a} vs {mt.team_b}</span>
             </Button>
           ))}
         </div>
@@ -173,9 +144,9 @@ export default function Live() {
 
       {/* Match card */}
       <Card className="border-primary/30 overflow-hidden">
-        <div className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider flex items-center gap-2 ${liveMatch.isLive ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground"}`}>
-          {liveMatch.isLive ? (
-            <><span className="h-2 w-2 rounded-full bg-current animate-pulse" /> En vivo</>
+        <div className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider flex items-center gap-2 ${started ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground"}`}>
+          {started ? (
+            <><span className="h-2 w-2 rounded-full bg-current animate-pulse" /> En juego</>
           ) : (
             <><Clock className="h-3 w-3" /> Próximo partido</>
           )}
@@ -190,9 +161,13 @@ export default function Live() {
               <div className="text-sm md:text-xl font-bold">{m.team_a}</div>
             </div>
             <div className="text-center">
-              {liveMatch.isLive || m.score_a !== null ? (
+              {isFinished ? (
                 <div className="text-4xl md:text-5xl font-bold tabular-nums">
                   {m.score_a ?? 0} <span className="text-muted-foreground">-</span> {m.score_b ?? 0}
+                </div>
+              ) : started ? (
+                <div className="text-2xl font-bold text-muted-foreground">
+                  - <span className="mx-1">vs</span> -
                 </div>
               ) : (
                 <div className="text-2xl font-bold text-muted-foreground">vs</div>
@@ -215,24 +190,30 @@ export default function Live() {
             </div>
           )}
 
-          {started && (
-            <div className="mt-6 rounded-md border bg-muted/40 p-3 text-sm">
-              {myPred ? (() => {
-                const partial = calcPoints(myPred.pred_a, myPred.pred_b, m.score_a, m.score_b);
-                return (
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-muted-foreground">
-                      Tu pronóstico: <strong className="text-foreground tabular-nums">{myPred.pred_a} - {myPred.pred_b}</strong>
-                    </span>
+          {started && !isFinished && (
+            <div className="mt-6 rounded-md border bg-muted/40 p-3 text-sm text-center text-muted-foreground italic">
+              El resultado se mostrará al finalizar el partido.
+            </div>
+          )}
+
+          {/* Mi pronóstico */}
+          {predsLocked && (
+            <div className="mt-4 rounded-md border bg-muted/40 p-3 text-sm">
+              {myPred ? (
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-muted-foreground">
+                    Tu pronóstico: <strong className="text-foreground tabular-nums">{myPred.pred_a} - {myPred.pred_b}</strong>
+                  </span>
+                  {isFinished && (
                     <span>
-                      <span className="text-muted-foreground mr-2">{m.status === "finished" ? "Final:" : "Parcial:"}</span>
-                      {partial === 3 ? <Badge className="bg-success text-success-foreground">+3 pts</Badge>
-                        : partial === 1 ? <Badge variant="secondary">+1 pt</Badge>
+                      <span className="text-muted-foreground mr-2">Final:</span>
+                      {(myPred.points ?? 0) === 3 ? <Badge className="bg-success text-success-foreground">+3 pts</Badge>
+                        : (myPred.points ?? 0) >= 1 ? <Badge variant="secondary">+{myPred.points} pt{(myPred.points ?? 0) > 1 ? "s" : ""}</Badge>
                         : <Badge variant="outline">0 pts</Badge>}
                     </span>
-                  </div>
-                );
-              })() : (
+                  )}
+                </div>
+              ) : (
                 <p className="text-muted-foreground text-center">No pronosticaste este partido.</p>
               )}
             </div>
@@ -240,7 +221,7 @@ export default function Live() {
         </CardContent>
       </Card>
 
-      {/* Pronósticos */}
+      {/* Pronósticos del grupo */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -254,28 +235,23 @@ export default function Live() {
             <p className="text-sm text-muted-foreground">Nadie pronosticó este partido.</p>
           ) : (
             <div className="space-y-2">
-              {predictions.map((p) => {
-                const exact = m.score_a !== null && m.score_b !== null && p.pred_a === m.score_a && p.pred_b === m.score_b;
-                const result = m.score_a !== null && m.score_b !== null && Math.sign(p.pred_a - p.pred_b) === Math.sign(m.score_a - m.score_b);
-                return (
-                  <div key={p.user_id} className="flex items-center justify-between py-2 border-b last:border-0">
-                    <span className="font-medium truncate">{p.display_name}</span>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-bold tabular-nums">{p.pred_a} - {p.pred_b}</span>
-                      {liveMatch.isLive || m.status === "finished" ? (
-                        exact ? <Badge className="bg-success text-success-foreground">+3</Badge>
-                        : result ? <Badge variant="secondary">+1</Badge>
-                        : <Badge variant="outline">0</Badge>
-                      ) : null}
-                    </div>
+              {predictions.map((p) => (
+                <div key={p.user_id} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <span className="font-medium truncate">{p.display_name}</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-bold tabular-nums">{p.pred_a} - {p.pred_b}</span>
+                    {isFinished ? (
+                      (p.points ?? 0) === 3 ? <Badge className="bg-success text-success-foreground">+3</Badge>
+                      : (p.points ?? 0) >= 1 ? <Badge variant="secondary">+{p.points}</Badge>
+                      : <Badge variant="outline">0</Badge>
+                    ) : null}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
       </Card>
-
     </div>
   );
 }
