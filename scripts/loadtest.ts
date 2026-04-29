@@ -95,10 +95,14 @@ async function main() {
   );
   const stopAt = Date.now() + DURATION_SEC * 1000;
   const tasks: Promise<void>[] = [];
+  // Login en batches para evitar rate-limit de auth (max ~30 logins/seg)
+  const BATCH = 20;
+  const BATCH_DELAY_MS = 1500;
   for (let i = 1; i <= CONCURRENCY; i++) {
     tasks.push(runUser(i, stopAt));
-    // pequeño jitter para no abrir 100 logins en el mismo ms
-    await new Promise((r) => setTimeout(r, 30));
+    if (i % BATCH === 0) {
+      await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+    }
   }
   await Promise.all(tasks);
   summarise();
