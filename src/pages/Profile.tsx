@@ -13,6 +13,7 @@ import {
   exportUserPredictionsCSV,
   exportUserPredictionsPDF,
 } from "@/lib/predictionsExport";
+import { TournamentRules } from "@/components/TournamentRules";
 
 export default function Profile() {
   const { user, isAdmin } = useAuth();
@@ -146,6 +147,8 @@ export default function Profile() {
           </div>
         </CardContent>
       </Card>
+
+      <TournamentRules />
     </div>
   );
 }
