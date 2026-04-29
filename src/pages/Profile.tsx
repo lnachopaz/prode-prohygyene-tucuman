@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, FileDown, FileText } from "lucide-react";
+import {
+  fetchUserPredictions,
+  exportUserPredictionsCSV,
+  exportUserPredictionsPDF,
+} from "@/lib/predictionsExport";
 
 export default function Profile() {
   const { user, isAdmin } = useAuth();
