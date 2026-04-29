@@ -36,7 +36,10 @@ Deno.serve(async (req) => {
 
   async function finishLog(patch: Record<string, unknown>) {
     if (!logId) return;
-    await admin.from("sync_logs").update({ ...patch, finished_at: new Date().toISOString() }).eq("id", logId);
+    await admin
+      .from("sync_logs")
+      .update({ ...patch, finished_at: new Date().toISOString() })
+      .eq("id", logId);
   }
 
   if (!apiKey) {
@@ -80,8 +83,109 @@ Deno.serve(async (req) => {
       return true;
     });
 
+    // ==========================================
+    // BUSCAR PARTIDOS UCL HOY (Champions League)
+    // ==========================================
+    // Si hoy hay partidos de Champions League, los agregamos automáticamente
+    // si no existen en la base de datos.
+
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+
+    try {
+      // Buscar competiciones de UEFA Champions League
+      const competitionsRes = await fetch(`${FD_BASE}/competitions`, {
+        headers: { "X-Auth-Token": apiKey },
+      });
+
+      if (competitionsRes.ok) {
+        const competitionsData = await competitionsRes.json();
+        const uclCompetition = competitionsData.competitions?.find(
+          (c: any) => c.code === "CL" || c.name?.includes("Champions League"),
+        );
+
+        if (uclCompetition) {
+          // Buscar partidos de la UCL de hoy
+          const uclMatchesRes = await fetch(
+            `${FD_BASE}/competitions/CL/matches?dateFrom=${todayStart}&dateTo=${todayEnd}`,
+            {
+              headers: { "X-Auth-Token": apiKey },
+            },
+          );
+
+          if (uclMatchesRes.ok) {
+            const uclMatchesData = await uclMatchesRes.json();
+            const uclMatches = uclMatchesData.matches ?? [];
+
+            for (const match of uclMatches) {
+              const externalId = `fd-${match.id}`;
+
+              // Verificar si ya existe en nuestra BD
+              const { data: existing } = await admin
+                .from("matches")
+                .select("id")
+                .eq("external_id", externalId)
+                .maybeSingle();
+
+              if (!existing) {
+                // No existe, lo creamos
+                const newStatus = mapStatus(match.status);
+                const score_a = match.score?.fullTime?.home ?? null;
+                const score_b = match.score?.fullTime?.away ?? null;
+
+                // Obtener banderas de los equipos
+                const teamAFlag = match.homeTeam?.crest || null;
+                const teamBFlag = match.awayTeam?.crest || null;
+
+                await admin.from("matches").insert({
+                  external_id: externalId,
+                  stage: match.competition?.name || "UEFA Champions League",
+                  group_name: match.stage || "UCL",
+                  team_a: match.homeTeam?.name || "Unknown",
+                  team_b: match.awayTeam?.name || "Unknown",
+                  team_a_flag: teamAFlag,
+                  team_b_flag: teamBFlag,
+                  kickoff_at: match.utcDate,
+                  status: newStatus,
+                  score_a,
+                  score_b,
+                  test_mode: false,
+                });
+              } else {
+                // Ya existe, actualizamos marcador y estado
+                const newStatus = mapStatus(match.status);
+                const score_a = match.score?.fullTime?.home ?? null;
+                const score_b = match.score?.fullTime?.away ?? null;
+
+                await admin
+                  .from("matches")
+                  .update({
+                    status: newStatus,
+                    score_a,
+                    score_b,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("external_id", externalId);
+              }
+            }
+          }
+        }
+      }
+    } catch (uclError) {
+      console.error("Error buscando partidos UCL:", uclError);
+      // Continuamos con el sync normal aunque falle la búsqueda de UCL
+    }
+
+    // ==========================================
+    // FIN BÚSQUEDA UCL
+    // ==========================================
+
     if (matches.length === 0) {
-      await finishLog({ status: "success", updated_count: 0, details: { message: "no relevant matches now", checked_at: nowIso } });
+      await finishLog({
+        status: "success",
+        updated_count: 0,
+        details: { message: "no relevant matches now", checked_at: nowIso },
+      });
       return new Response(
         JSON.stringify({ updated: 0, message: "No hay partidos en vivo ni próximos a sincronizar." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -152,10 +256,9 @@ Deno.serve(async (req) => {
       error_message: errCount > 0 ? `${errCount} partidos no se pudieron sincronizar` : null,
     });
 
-    return new Response(
-      JSON.stringify({ updated: okCount, results }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ updated: okCount, results }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("sync-live-matches error:", e);
