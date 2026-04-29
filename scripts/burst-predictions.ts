@@ -26,13 +26,16 @@ const stats: Stats = { ok: 0, err: 0, latencies: [], errors: [] };
 
 async function loadOpenMatches(): Promise<string[]> {
   const c = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const nowPlus1h = new Date(Date.now() + 60 * 60 * 1000 + 5000).toISOString();
-  const { data } = await c
+  // Login con un usuario aprobado para poder leer matches con RLS
+  await c.auth.signInWithPassword({ email: "loadtest+1@prode.test", password: PASSWORD });
+  const { data, error } = await c
     .from("matches")
-    .select("id, kickoff_at")
-    .gt("kickoff_at", nowPlus1h)
+    .select("id, team_a, team_b, kickoff_at")
+    .gt("kickoff_at", new Date(Date.now() + 65 * 60 * 1000).toISOString())
     .order("kickoff_at")
     .limit(MATCHES_PER);
+  if (error) console.error("loadOpenMatches:", error.message);
+  await c.auth.signOut();
   return (data ?? []).map((m: any) => m.id);
 }
 
