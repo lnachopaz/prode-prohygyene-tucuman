@@ -764,6 +764,7 @@ function TestModeAdmin() {
 
   return (
     <div className="space-y-6">
+      <BulkSimulator />
       <Card className="border-yellow-500/40 bg-yellow-500/5">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
