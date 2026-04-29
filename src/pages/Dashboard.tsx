@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Trophy, ListChecks, Calendar, Target, TrendingUp, Loader2, Radio } from "lucide-react";
 import { Countdown } from "@/components/Countdown";
 import { formatAR } from "@/lib/datetime";
+import { TournamentRules } from "@/components/TournamentRules";
 
 export default function Dashboard() {
   const { user } = useAuth();
