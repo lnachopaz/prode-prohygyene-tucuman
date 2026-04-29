@@ -33,6 +33,15 @@ type Match = {
   score_a: number | null;
   score_b: number | null;
   predictions_lock_mode?: "auto" | "force_open" | "force_closed";
+  prediction_window_id: string | null;
+};
+
+type PredictionWindow = {
+  id: string;
+  label: string;
+  opens_at: string;
+  closes_at: string;
+  sort_order: number;
 };
 
 type Prediction = {
@@ -70,6 +79,24 @@ export default function Predictions() {
       return data as Prediction[];
     },
   });
+
+  const { data: windows } = useQuery({
+    queryKey: ["prediction-windows"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("prediction_windows")
+        .select("*")
+        .order("sort_order");
+      if (error) throw error;
+      return data as PredictionWindow[];
+    },
+  });
+
+  const windowMap = useMemo(() => {
+    const m = new Map<string, PredictionWindow>();
+    windows?.forEach((w) => m.set(w.id, w));
+    return m;
+  }, [windows]);
 
   const predMap = useMemo(() => {
     const m = new Map<string, Prediction>();
@@ -241,6 +268,7 @@ export default function Predictions() {
                   <MatchCard
                     key={m.id}
                     match={matchWithFlags}
+                    window={m.prediction_window_id ? windowMap.get(m.prediction_window_id) : undefined}
                     prediction={predMap.get(m.id)}
                     onSaved={() => qc.invalidateQueries({ queryKey: ["my-preds"] })}
                   />
@@ -256,10 +284,12 @@ export default function Predictions() {
 
 function MatchCard({
   match,
+  window: predWindow,
   prediction,
   onSaved,
 }: {
   match: Match;
+  window?: PredictionWindow;
   prediction?: Prediction;
   onSaved: () => void;
 }) {
@@ -274,7 +304,17 @@ function MatchCard({
   const timeLocked = !isAfter(lockAt, now) || match.status !== "scheduled";
   const lockedByAdmin = lockMode === "force_closed";
   const forcedOpen = lockMode === "force_open" && match.status === "scheduled";
-  const locked = lockedByAdmin || (!forcedOpen && timeLocked);
+
+  // Estado de la ventana de carga (fecha del torneo)
+  const windowOpen = !predWindow
+    ? true
+    : now >= new Date(predWindow.opens_at) && now <= new Date(predWindow.closes_at);
+  const windowNotYetOpen = predWindow ? now < new Date(predWindow.opens_at) : false;
+  const windowClosed = predWindow ? now > new Date(predWindow.closes_at) : false;
+
+  const locked =
+    lockedByAdmin ||
+    (!forcedOpen && (timeLocked || !windowOpen));
 
   const [a, setA] = useState<string>(prediction?.pred_a?.toString() ?? "");
   const [b, setB] = useState<string>(prediction?.pred_b?.toString() ?? "");
@@ -312,6 +352,10 @@ function MatchCard({
     if (match.status === "finished") return <Badge variant="secondary">Finalizado</Badge>;
     if (lockedByAdmin) return <Badge variant="destructive" className="gap-1"><Lock className="h-3 w-3" /> Bloqueado por admin</Badge>;
     if (forcedOpen && timeLocked) return <Badge className="gap-1 bg-green-600 hover:bg-green-600">Reabierto por admin</Badge>;
+    if (windowNotYetOpen && predWindow)
+      return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Abre {formatAR(predWindow.opens_at, "dd/MM HH:mm")}</Badge>;
+    if (windowClosed && predWindow)
+      return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Ventana cerrada</Badge>;
     if (locked) return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Cerrado</Badge>;
     return <Badge variant="outline">{formatAR(match.kickoff_at, "HH:mm 'hs'")}</Badge>;
   };
