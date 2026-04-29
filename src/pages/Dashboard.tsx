@@ -106,7 +106,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-lg font-bold truncate">{featured.team_a} vs {featured.team_b}</div>
                 <div className="text-xs text-muted-foreground">
-                  {format(new Date(featured.kickoff_at), "EEEE dd MMM · HH:mm 'hs'", { locale: es })}
+                  {formatAR(featured.kickoff_at, "EEEE dd MMM · HH:mm 'hs'")}
                 </div>
               </div>
               {isLive ? (
