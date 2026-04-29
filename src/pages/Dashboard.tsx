@@ -115,9 +115,6 @@ export default function Dashboard() {
                   <div className="text-sm text-muted-foreground italic">
                     Resultado al finalizar
                   </div>
-                  <Button asChild size="sm" variant="outline" className="mt-2">
-                    <Link to="/live">Ver en juego</Link>
-                  </Button>
                 </div>
               ) : (
                 <Countdown to={featured.kickoff_at} />
