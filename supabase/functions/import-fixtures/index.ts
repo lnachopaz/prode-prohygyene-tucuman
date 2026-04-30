@@ -77,10 +77,16 @@ Deno.serve(async (req) => {
     const wcData = await wcRes.json();
     const wcMatches = wcData.matches ?? [];
 
+    const normalizeGroup = (g: string | null | undefined): string | null => {
+      if (!g) return null;
+      const m = g.match(/^GROUP[_\s]?([A-Z])$/i);
+      return m ? `Grupo ${m[1].toUpperCase()}` : g;
+    };
+
     const wcRows = wcMatches.map((m: any) => ({
       external_id: `fd-${m.id}`,
       stage: STAGE_LABEL[m.stage] ?? m.stage,
-      group_name: m.group ?? null,
+      group_name: normalizeGroup(m.group),
       team_a: m.homeTeam?.name ?? "TBD",
       team_b: m.awayTeam?.name ?? "TBD",
       team_a_flag: m.homeTeam?.crest ?? null,
