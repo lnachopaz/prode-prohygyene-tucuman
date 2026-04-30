@@ -7,7 +7,7 @@ export function TournamentRules() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5" /> Reglas del Prode 2026 Prohygiene
+          <BookOpen className="h-5 w-5" /> Reglamento Prode Prohygiene 2026
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 text-sm">
@@ -21,13 +21,13 @@ export function TournamentRules() {
           </p>
           <ul className="space-y-1 text-muted-foreground">
             <li>• <strong>Fecha 1</strong> (fase de grupos): ya disponible</li>
-            <li>• <strong>Fecha 2</strong> (fase de grupos): desde el 11/06</li>
-            <li>• <strong>Fecha 3</strong> (fase de grupos): desde el 18/06</li>
-            <li>• <strong>Dieciseisavos de final</strong>: desde el 24/06</li>
-            <li>• <strong>Octavos de final</strong>: desde el 28/06</li>
-            <li>• <strong>Cuartos de final</strong>: desde el 04/07</li>
-            <li>• <strong>Semifinales</strong>: desde el 09/07</li>
-            <li>• <strong>Final y 3°/4° puesto</strong>: desde el 14/07</li>
+            <li>• <strong>Fecha 2</strong> (fase de grupos): a partir del 11/06</li>
+            <li>• <strong>Fecha 3</strong> (fase de grupos): a partir del 18/06</li>
+            <li>• <strong>Dieciseisavos de final</strong>: a partir del 24/06</li>
+            <li>• <strong>Octavos de final</strong>: a partir del 28/06</li>
+            <li>• <strong>Cuartos de final</strong>: a partir del 04/07</li>
+            <li>• <strong>Semifinales</strong>: a partir del 09/07</li>
+            <li>• <strong>Final y 3°/4° puesto</strong>: a partir del 14/07</li>
           </ul>
           <p className="text-xs text-muted-foreground mt-2 italic">
             Una vez vencido el plazo o iniciado el partido, no se podrán editar los pronósticos.
@@ -39,7 +39,7 @@ export function TournamentRules() {
             <Target className="h-4 w-4 text-primary" /> Puntaje
           </h3>
           <ul className="space-y-1 text-muted-foreground">
-            <li>• <strong>Resultado exacto</strong> (goles de ambos equipos): <Badge variant="secondary">3 pts</Badge></li>
+            <li>• <strong>Pleno</strong> (goles de ambos equipos): <Badge variant="secondary">3 pts</Badge></li>
             <li>• <strong>Acierto del ganador o empate</strong>, sin resultado exacto: <Badge variant="secondary">1 pt</Badge></li>
             <li>• <strong>Pronóstico incorrecto</strong>: <Badge variant="outline">0 pts</Badge></li>
           </ul>
