@@ -1,89 +1,92 @@
-# Plan: Nuevo sistema de puntos con multiplicadores
+## Objetivo
 
-## Reglas finales acordadas
+1. Crear el usuario admin **Ignacio Paz** (ignacio.paz@prohygiene.com).
+2. Importar los **104 partidos del Mundial 2026** desde Football-Data.org (ya verificado: la API devuelve los 104 con fechas, equipos y escudos).
+3. Importar los partidos de **UCL de la próxima semana** (semifinales ida: Arsenal–Atlético 5/5 y Bayern–PSG 6/5).
+4. Configurar **ventanas de pronóstico** por fase para el Mundial con los plazos pedidos.
 
-| Condición | Multiplicador |
-|---|---|
-| Partido de Argentina | **x2** |
-| Final del Mundial | **x3** |
-| Octavos / Cuartos / Semis (eliminatorias previas a la final) | **x1.2** |
-| Final de Argentina (caso combinado) | **x6** (2 × 3, se acumulan) |
-| Argentina en Semis (ej.) | **x2.4** (2 × 1.2) |
+---
 
-Base sigue igual: 3 pts pleno, 1 pt resultado, 0 pts si falla.
+## 1. Crear admin Ignacio Paz
 
-Sin penalización por no pronosticar.
+Pasos:
+- Generar un código de invitación admin nuevo en `admin_invite_codes` (ej: `IGNACIO-PAZ-2026`).
+- Crear el usuario vía `auth.admin.createUser` con email confirmado, password `Batuque1277` y `raw_user_meta_data = { display_name: "Ignacio Paz", admin_code: "IGNACIO-PAZ-2026" }`. El trigger `handle_new_user` lo marca automáticamente como `admin` + `approved`.
+- Lo haré desde una edge function de un solo uso (`bootstrap-admin`) que use el `SUPABASE_SERVICE_ROLE_KEY`, la invocaré una vez y luego la dejo lista por si se necesita.
 
-## Cambios
+> Alternativa: crearlo directo con el endpoint admin de Supabase desde el sandbox. Voy a usar la edge function porque es más limpio y queda auditable.
 
-### 1. Función `calc_points` en la base de datos
-Reescribirla para que reciba el partido completo y aplique los multiplicadores. Nueva firma sugerida:
+---
 
-```sql
-calc_points_v2(pa, pb, sa, sb, team_a, team_b, stage)
-  base = 3 si pleno, 1 si resultado, 0 si falla
-  mult = 1
-  si team_a o team_b contiene 'Argentina' → mult *= 2
-  si stage es la final del Mundial → mult *= 3
-  sino si stage es octavos/cuartos/semis → mult *= 1.2
-  return floor(base * mult)
-```
+## 2. Ventanas de pronóstico (prediction_windows)
 
-Detalle:
-- Detección de Argentina: `team_a ILIKE '%argentina%' OR team_b ILIKE '%argentina%'`.
-- Detección de fase por `matches.stage` (texto). Mapeo robusto:
-  - **Final**: contiene `'final'` y NO contiene `'semi'` ni `'tercer'/'third'/'1/2'`.
-  - **Eliminatorias x1.2**: contiene `'octavo'/'round of 16'/'last 16'` o `'cuarto'/'quarter'` o `'semi'`.
-  - **Tercer puesto**: lo tratamos como x1.2 también (es eliminatoria). Puede revisarse.
-  - Resto (grupos): x1.
-- Como los multiplicadores no enteros (1.2, 2.4, etc.) generan decimales, se usa `ROUND(base * mult)` para mantener `points` como `int`. Ejemplos:
-  - Pleno en cuartos: 3 × 1.2 = 3.6 → **4 pts**
-  - Resultado en cuartos: 1 × 1.2 = 1.2 → **1 pt**
-  - Pleno Argentina en semis: 3 × 2 × 1.2 = 7.2 → **7 pts**
-  - Pleno Argentina en final: 3 × 2 × 3 = **18 pts**
+Mapeo exacto de fechas pedidas → ventanas que se aplican a cada partido por fase:
 
-### 2. Mantener compatibilidad
-- La función vieja `calc_points(pa,pb,sa,sb)` se mantiene (algunas migraciones la referencian) pero internamente llama a la nueva con valores neutros, **o** la actualizamos para que siga existiendo y creamos `calc_points_match(pred_a, pred_b, match_id)` como wrapper.
-- Actualizar:
-  - `recalc_predictions_for_match` (trigger en matches) → usar la nueva fórmula con datos de `NEW`.
-  - `recalc_match_points(_match_id)` (función admin) → idem, lee el match y aplica.
+| ID ventana       | Label                  | Abre (ART)        | Cierra                                  | Aplica a stage                 |
+|------------------|------------------------|-------------------|-----------------------------------------|--------------------------------|
+| `wc-md1`         | Fecha 1 - Grupos       | 31/05 00:00       | 10/06 23:59                             | GROUP_STAGE matchday 1         |
+| `wc-md2`         | Fecha 2 - Grupos       | 11/06 00:00       | 1h antes del kickoff de cada partido*   | GROUP_STAGE matchday 2         |
+| `wc-md3`         | Fecha 3 - Grupos       | 18/06 00:00       | 1h antes del kickoff*                   | GROUP_STAGE matchday 3         |
+| `wc-r32`         | 16avos de final        | 24/06 00:00       | 1h antes del kickoff*                   | LAST_32                        |
+| `wc-r16`         | Octavos de final       | 28/06 00:00       | 1h antes del kickoff*                   | LAST_16                        |
+| `wc-qf`          | Cuartos de final       | 04/07 00:00       | 1h antes del kickoff*                   | QUARTER_FINALS                 |
+| `wc-sf`          | Semifinales            | 09/07 00:00       | 1h antes del kickoff*                   | SEMI_FINALS                    |
+| `wc-final`       | Final + 3er puesto     | 14/07 00:00       | 1h antes del kickoff*                   | FINAL + THIRD_PLACE            |
 
-### 3. Recalcular puntos históricos
-Una sola vez en la migración: `UPDATE predictions ... SET points = nuevo_cálculo` para todos los partidos ya finalizados, así el ranking refleja las nuevas reglas desde el inicio.
+\* Como `prediction_windows` solo tiene `opens_at`/`closes_at` globales, voy a setear `closes_at` al inicio del último partido de la fase. El cierre 1h antes por partido ya lo hace el RLS automáticamente con `m.kickoff_at > now() + 1h` en modo `auto`. Así combinamos: la ventana abre la carga progresiva y el bloqueo 1h-pre-partido funciona por partido.
 
-### 4. UI: actualizar `TournamentRules.tsx`
-Reescribir la sección Puntaje:
+Todas se insertan en `prediction_windows` con `sort_order` 1–8.
 
-> **Multiplicadores** (se acumulan si coinciden):
-> - **x2** en partidos de Argentina
-> - **x3** en la Final del Mundial
-> - **x1.2** en Octavos, Cuartos y Semifinales
->
-> Ejemplos:
-> - Pleno en un partido normal: 3 pts
-> - Pleno en cuartos de Argentina: 3 × 2 × 1.2 = **7 pts**
-> - Pleno en la Final con Argentina: 3 × 2 × 3 = **18 pts**
+---
 
-### 5. UI: mostrar el multiplicador en cada partido
-En `Predictions.tsx` y en la tarjeta del próximo partido (Dashboard), agregar un badge cuando aplica:
-- 🇦🇷 **x2** si juega Argentina
-- 🏆 **x3** si es la final
-- ⚡ **x1.2** si es octavos/cuartos/semis
-- Combinado: **x6** si es final de Argentina, **x2.4** si Argentina en semis, etc.
+## 3. Importar partidos
 
-Esto hace el sistema transparente y agrega tensión a los partidos importantes.
+### 3a. Mundial (104 partidos)
 
-## Detalles técnicos
+- Llamada única a `GET /v4/competitions/WC/matches` (Football-Data).
+- Por cada partido inserto en `matches`:
+  - `external_id` = `fd-<id>`
+  - `stage` = mapeo legible: `GROUP_STAGE` → `Group Stage`, `LAST_32` → `Dieciseisavos`, `LAST_16` → `Octavos`, `QUARTER_FINALS` → `Cuartos`, `SEMI_FINALS` → `Semifinal`, `THIRD_PLACE` → `Tercer Puesto`, `FINAL` → `Final`. Esto importa porque `calc_points_match` detecta la fase por el texto del stage para aplicar multiplicadores (x1.2 knockout, x3 final).
+  - `group_name` = `GROUP_A`...`GROUP_L` (solo en fase de grupos).
+  - `team_a`, `team_b`, `team_a_flag`, `team_b_flag` desde la API.
+  - `kickoff_at` = `utcDate`.
+  - `prediction_window_id` = la ventana correspondiente según stage + matchday.
+  - `predictions_lock_mode` = `auto`.
+  - `test_mode` = `false`.
 
-- Los puntos en `predictions.points` quedan en INTEGER (con redondeo `ROUND`).
-- La detección de fase por texto es lo más portable; alternativa más robusta sería agregar columnas `is_final BOOLEAN` y `is_knockout BOOLEAN` a `matches`, pero implica seedear cada partido. **Propongo empezar por detección por texto** y, si vemos errores, migrar a columnas.
-- Performance: `calc_points` sigue siendo `IMMUTABLE`/`STABLE` y trivial.
+### 3b. UCL próxima semana
 
-## Pregunta abierta menor
-- **Tercer puesto** (3°/4°): ¿lo tratamos como x1.2 (eliminatoria) o como partido normal x1? Sugiero **x1.2** por consistencia, pero si querés que solo cuente como un partido más, lo dejo en x1.
+- Llamada a `GET /v4/competitions/CL/matches?dateFrom=2026-05-04&dateTo=2026-05-10` (devuelve Arsenal–Atlético y Bayern–PSG, ambas SEMI_FINALS).
+- Inserto igual que arriba pero con `stage = "UEFA Champions League - Semifinal"`, `prediction_window_id = NULL` (sin ventana específica → solo aplica el lock automático de 1h pre-kickoff).
 
-## Archivos a tocar
-- `supabase/migrations/<nuevo>.sql` — nueva función + recálculo histórico.
-- `src/components/TournamentRules.tsx` — texto de reglas.
-- `src/pages/Predictions.tsx` — badge de multiplicador junto a cada partido.
-- `src/pages/Dashboard.tsx` — badge en la tarjeta de "próximo partido" (opcional).
+> Nota: como `calc_points_match` busca `%semi%` en el stage para aplicar el x1.2, también va a aplicar a estos partidos UCL. Si no querés multiplicador en UCL, avisame y filtro por nombre de competición en el stage.
+
+---
+
+## 4. Detalles técnicos
+
+### Edge function `bootstrap-admin` (one-shot)
+- Crea el invite code y el usuario admin.
+- Devuelve `{ ok: true, user_id }`.
+
+### Edge function `import-fixtures` (one-shot)
+- Inserta las 8 ventanas (idempotente, `ON CONFLICT DO NOTHING`).
+- Trae los 104 partidos del Mundial + 2 UCL.
+- Inserta vía `upsert` por `external_id` para que sea reejecutable.
+- Devuelve resumen `{ wc_inserted, ucl_inserted, windows_inserted }`.
+
+### Archivos a crear
+- `supabase/functions/bootstrap-admin/index.ts`
+- `supabase/functions/import-fixtures/index.ts`
+
+### Sin cambios de schema
+- No hace falta migración: las tablas `prediction_windows`, `matches`, `admin_invite_codes` ya existen con todas las columnas necesarias.
+- El usuario se crea vía API admin de Supabase (no migración).
+
+---
+
+## Pregunta abierta
+
+**Multiplicador UCL semifinales**: como tu sistema actual aplica x1.2 a cualquier stage que contenga "semi", los partidos UCL de la próxima semana van a sumar x1.2. ¿Lo dejo así (consistente con la regla actual) o el multiplicador solo debería aplicar al Mundial?
+
+Si querés que solo aplique al Mundial, lo más limpio es actualizar `calc_points_match` para que también valide que el stage sea "World Cup" (puedo hacerlo en una mini-migración). Decime qué preferís y lo incluyo al ejecutar.
