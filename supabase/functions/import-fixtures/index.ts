@@ -10,7 +10,7 @@ const corsHeaders = {
 const FD_BASE = "https://api.football-data.org/v4";
 
 const STAGE_LABEL: Record<string, string> = {
-  GROUP_STAGE: "Group Stage",
+  GROUP_STAGE: "Fase de Grupos",
   LAST_32: "Dieciseisavos",
   LAST_16: "Octavos",
   QUARTER_FINALS: "Cuartos",
@@ -18,6 +18,22 @@ const STAGE_LABEL: Record<string, string> = {
   THIRD_PLACE: "Tercer Puesto",
   FINAL: "Final",
 };
+
+const TEAM_ES: Record<string, string> = {
+  "Algeria": "Argelia", "Belgium": "Bélgica", "Bosnia-Herzegovina": "Bosnia y Herzegovina",
+  "Brazil": "Brasil", "Canada": "Canadá", "Cape Verde Islands": "Cabo Verde",
+  "Congo DR": "RD del Congo", "Croatia": "Croacia", "Curaçao": "Curazao",
+  "Czechia": "República Checa", "Egypt": "Egipto", "England": "Inglaterra",
+  "France": "Francia", "Germany": "Alemania", "Haiti": "Haití", "Iran": "Irán",
+  "Iraq": "Irak", "Ivory Coast": "Costa de Marfil", "Japan": "Japón",
+  "Jordan": "Jordania", "Mexico": "México", "Morocco": "Marruecos",
+  "Netherlands": "Países Bajos", "New Zealand": "Nueva Zelanda", "Norway": "Noruega",
+  "Panama": "Panamá", "Qatar": "Catar", "Saudi Arabia": "Arabia Saudita",
+  "Scotland": "Escocia", "South Africa": "Sudáfrica", "South Korea": "Corea del Sur",
+  "Spain": "España", "Sweden": "Suecia", "Switzerland": "Suiza", "Tunisia": "Túnez",
+  "Turkey": "Turquía", "United States": "Estados Unidos", "Uzbekistan": "Uzbekistán",
+};
+const tEs = (n: string | undefined): string => (n && TEAM_ES[n]) || n || "TBD";
 
 // Ventanas de pronóstico (timestamps ISO en UTC; ART = UTC-3)
 const WINDOWS = [
@@ -87,8 +103,8 @@ Deno.serve(async (req) => {
       external_id: `fd-${m.id}`,
       stage: STAGE_LABEL[m.stage] ?? m.stage,
       group_name: normalizeGroup(m.group),
-      team_a: m.homeTeam?.name ?? "TBD",
-      team_b: m.awayTeam?.name ?? "TBD",
+      team_a: tEs(m.homeTeam?.name),
+      team_b: tEs(m.awayTeam?.name),
       team_a_flag: m.homeTeam?.crest ?? null,
       team_b_flag: m.awayTeam?.crest ?? null,
       kickoff_at: m.utcDate,
@@ -117,8 +133,8 @@ Deno.serve(async (req) => {
       external_id: `fd-${m.id}`,
       stage: `UEFA Champions League - ${STAGE_LABEL[m.stage] ?? m.stage}`,
       group_name: null,
-      team_a: m.homeTeam?.name ?? "TBD",
-      team_b: m.awayTeam?.name ?? "TBD",
+      team_a: tEs(m.homeTeam?.name),
+      team_b: tEs(m.awayTeam?.name),
       team_a_flag: m.homeTeam?.crest ?? null,
       team_b_flag: m.awayTeam?.crest ?? null,
       kickoff_at: m.utcDate,
