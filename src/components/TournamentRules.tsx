@@ -7,7 +7,7 @@ export function TournamentRules() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5" /> Reglas del Prode 2026 Prohygiene
+          <BookOpen className="h-5 w-5" /> Reglamento Prode Prohygiene 2026
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 text-sm">
