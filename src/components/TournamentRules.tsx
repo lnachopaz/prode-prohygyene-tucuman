@@ -39,7 +39,7 @@ export function TournamentRules() {
             <Target className="h-4 w-4 text-primary" /> Puntaje
           </h3>
           <ul className="space-y-1 text-muted-foreground">
-            <li>• <strong>Resultado exacto</strong> (goles de ambos equipos): <Badge variant="secondary">3 pts</Badge></li>
+            <li>• <strong>Pleno</strong> (goles de ambos equipos): <Badge variant="secondary">3 pts</Badge></li>
             <li>• <strong>Acierto del ganador o empate</strong>, sin resultado exacto: <Badge variant="secondary">1 pt</Badge></li>
             <li>• <strong>Pronóstico incorrecto</strong>: <Badge variant="outline">0 pts</Badge></li>
           </ul>
