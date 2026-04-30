@@ -47,14 +47,16 @@ export function TournamentRules() {
             <p className="font-medium mb-1">Multiplicadores (se acumulan si coinciden):</p>
             <ul className="space-y-1 text-muted-foreground">
               <li>• <Badge>x2</Badge> en partidos de Argentina</li>
-              <li>• <Badge>x3</Badge> en la final del Mundial</li>
-              <li>• <Badge>x1,2</Badge> en octavos, cuartos, semifinales y 3° puesto</li>
+              <li>• <Badge>x2</Badge> en la final del Mundial</li>
+              <li>• <Badge>x1,5</Badge> en semifinales y partido por el 3° puesto</li>
+              <li>• <Badge>x1,2</Badge> en cuartos de final</li>
+              <li>• Dieciseisavos y octavos: sin multiplicador de fase</li>
             </ul>
             <div className="mt-2 rounded-md border bg-muted/40 p-2 text-xs space-y-1">
               <p className="font-medium text-foreground">Ejemplos:</p>
               <p>• Pleno en un partido normal: <strong>3 pts</strong></p>
               <p>• Pleno en cuartos de Argentina: 3 × 2 × 1,2 = <strong>7 pts</strong></p>
-              <p>• Pleno en la Final con Argentina: 3 × 2 × 3 = <strong>18 pts</strong></p>
+              <p>• Pleno en la Final con Argentina: 3 × 2 × 2 = <strong>12 pts</strong></p>
             </div>
           </div>
         </section>

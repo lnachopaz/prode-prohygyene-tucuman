@@ -1,10 +1,17 @@
 /**
- * Multiplicadores del Prode 2026:
- * - x2 si juega Argentina
- * - x3 en la final del Mundial
- * - x1.2 en octavos / cuartos / semis / 3° puesto
- * Se acumulan: una final con Argentina = x6.
+ * Multiplicadores del Prode 2026 (solo Mundial; UCL no aplica multiplicadores de fase):
+ * - x2 si juega Argentina (siempre, acumula)
+ * - Dieciseisavos: sin multiplicador de fase
+ * - Octavos: sin multiplicador de fase
+ * - Cuartos: x1.2
+ * - Semifinales / 3° puesto: x1.5
+ * - Final: x2
+ * Se acumulan: una final con Argentina = x4.
  */
+
+function isUCL(stage: string): boolean {
+  return stage.includes("champions");
+}
 
 export function getMatchMultiplier(
   team_a: string | null | undefined,
@@ -20,6 +27,8 @@ export function getMatchMultiplier(
     mult *= 2;
   }
 
+  if (isUCL(s)) return mult;
+
   const isFinal =
     s.includes("final") &&
     !s.includes("semi") &&
@@ -30,34 +39,28 @@ export function getMatchMultiplier(
     !s.includes("quarter") &&
     !s.includes("octavo");
 
-  const isKnockout =
+  const isSemi =
     !isFinal &&
-    (s.includes("octavo") ||
-      s.includes("round of 16") ||
-      s.includes("last 16") ||
-      s.includes("cuarto") ||
-      s.includes("quarter") ||
-      s.includes("semi") ||
-      s.includes("tercer") ||
-      s.includes("third") ||
-      s.includes("1/2"));
+    (s.includes("semi") || s.includes("1/2") || s.includes("tercer") || s.includes("third"));
 
-  if (isFinal) mult *= 3;
-  else if (isKnockout) mult *= 1.2;
+  const isQuarter = !isFinal && !isSemi && (s.includes("cuarto") || s.includes("quarter"));
+
+  if (isFinal) mult *= 2;
+  else if (isSemi) mult *= 1.5;
+  else if (isQuarter) mult *= 1.2;
 
   return mult;
 }
 
 export function formatMultiplier(mult: number): string {
   if (Number.isInteger(mult)) return `x${mult}`;
-  // 1.2, 2.4, 3.6, 6 etc.
   return `x${mult.toFixed(1).replace(/\.0$/, "")}`;
 }
 
 export type MultiplierInfo = {
   mult: number;
-  label: string; // "x6"
-  reasons: string[]; // ["Argentina", "Final"]
+  label: string;
+  reasons: string[];
 };
 
 export function getMultiplierInfo(
@@ -72,17 +75,18 @@ export function getMultiplierInfo(
   const tb = (team_b ?? "").toLowerCase();
   const s = (stage ?? "").toLowerCase();
   if (ta.includes("argentina") || tb.includes("argentina")) reasons.push("Argentina");
-  const isFinal =
-    s.includes("final") && !s.includes("semi") && !s.includes("tercer") &&
-    !s.includes("third") && !s.includes("1/2") &&
-    !s.includes("cuarto") && !s.includes("quarter") && !s.includes("octavo");
-  if (isFinal) reasons.push("Final");
-  else if (
-    s.includes("octavo") || s.includes("round of 16") || s.includes("last 16") ||
-    s.includes("cuarto") || s.includes("quarter") ||
-    s.includes("semi") || s.includes("tercer") || s.includes("third") || s.includes("1/2")
-  ) {
-    reasons.push("Eliminatoria");
+
+  if (!isUCL(s)) {
+    const isFinal =
+      s.includes("final") && !s.includes("semi") && !s.includes("tercer") &&
+      !s.includes("third") && !s.includes("1/2") &&
+      !s.includes("cuarto") && !s.includes("quarter") && !s.includes("octavo");
+    const isSemi =
+      !isFinal && (s.includes("semi") || s.includes("1/2") || s.includes("tercer") || s.includes("third"));
+    const isQuarter = !isFinal && !isSemi && (s.includes("cuarto") || s.includes("quarter"));
+    if (isFinal) reasons.push("Final");
+    else if (isSemi) reasons.push("Semifinal / 3° puesto");
+    else if (isQuarter) reasons.push("Cuartos");
   }
   return { mult, label: formatMultiplier(mult), reasons };
 }
