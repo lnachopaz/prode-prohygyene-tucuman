@@ -14,7 +14,10 @@ export function ProtectedRoute({ children, requireAdmin = false }: { children: R
   }
 
   if (!user) return <Navigate to="/auth" replace />;
-  if (!isAdmin && status && status !== "approved") return <Navigate to="/pending" replace />;
+  // Si el usuario no es admin y su perfil no está explícitamente aprobado
+  // (incluye status === null por falta de perfil o demora del trigger),
+  // redirigir a la pantalla de "pendiente". Solo "approved" da acceso.
+  if (!isAdmin && status !== "approved") return <Navigate to="/pending" replace />;
   if (requireAdmin && !isAdmin) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
