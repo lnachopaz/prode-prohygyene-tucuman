@@ -126,7 +126,7 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <img src={logo} alt="ProHygiene" className="h-16 w-auto mb-4" />
+          <img src={logo} alt="ProHygiene" className="h-20 md:h-24 w-auto mb-4 object-contain" />
           <h1 className="text-2xl font-bold text-center">Prode Mundial 2026</h1>
           <p className="text-sm text-muted-foreground text-center mt-1">
             Pronosticá los partidos y competí con tu grupo
