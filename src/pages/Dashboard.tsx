@@ -10,6 +10,7 @@ import { Countdown } from "@/components/Countdown";
 import { formatAR } from "@/lib/datetime";
 import { TournamentRules } from "@/components/TournamentRules";
 import { getMultiplierInfo } from "@/lib/scoring";
+import { formatPoints } from "@/lib/formatPoints";
 import { Sparkles } from "lucide-react";
 
 export default function Dashboard() {
