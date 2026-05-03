@@ -432,10 +432,6 @@ function MatchCard({
                 <span className="text-muted-foreground">Sin pronóstico</span>
               )}
             </span>
-              ) : (
-                <span className="text-muted-foreground">Sin pronóstico</span>
-              )}
-            </span>
           </div>
         )}
 
