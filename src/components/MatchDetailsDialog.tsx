@@ -20,6 +20,7 @@ import {
 import { BarChart3, Loader2, MapPin, Calendar } from "lucide-react";
 import { formatAR } from "@/lib/datetime";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
+import { formatPoints } from "@/lib/formatPoints";
 
 type MatchDetails = {
   id: string;
