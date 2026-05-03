@@ -91,9 +91,9 @@ export function MatchDetailsDialog({ match }: { match: MatchDetails }) {
       .slice(0, 5);
   })();
 
-  const hits = data?.filter((p) => p.points === 3).length ?? 0;
-  const partial = data?.filter((p) => p.points === 1).length ?? 0;
-  const wrong = data?.filter((p) => p.points === 0).length ?? 0;
+  const hits = data?.filter((p) => p.pred_a === match.score_a && p.pred_b === match.score_b).length ?? 0;
+  const partial = data?.filter((p) => !(p.pred_a === match.score_a && p.pred_b === match.score_b) && Number(p.points) > 0).length ?? 0;
+  const wrong = data?.filter((p) => Number(p.points) === 0).length ?? 0;
 
   return (
     <Dialog>
