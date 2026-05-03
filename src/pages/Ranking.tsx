@@ -458,7 +458,7 @@ export default function Ranking() {
                     </div>
 
                     <div className="text-right shrink-0">
-                      <div className="text-xl font-bold tabular-nums leading-none">{row.total_points}</div>
+                      <div className="text-xl font-bold tabular-nums leading-none">{formatPoints(row.total_points)}</div>
                       <div className="text-[10px] text-muted-foreground mt-0.5">pts</div>
                     </div>
                   </div>
