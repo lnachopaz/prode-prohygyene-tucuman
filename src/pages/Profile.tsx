@@ -14,6 +14,7 @@ import {
   exportUserPredictionsPDF,
 } from "@/lib/predictionsExport";
 import { TournamentRules } from "@/components/TournamentRules";
+import { formatPoints } from "@/lib/formatPoints";
 
 export default function Profile() {
   const { user, isAdmin } = useAuth();
