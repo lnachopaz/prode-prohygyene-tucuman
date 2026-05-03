@@ -375,7 +375,7 @@ export default function Ranking() {
                   <div className="font-medium text-sm truncate" title={b?.display_name}>
                     {b?.display_name ?? "—"}
                   </div>
-                  <div className="text-xs text-primary font-semibold">{b?.total_points ?? 0} pts</div>
+                  <div className="text-xs text-primary font-semibold">{formatPoints(b?.total_points ?? 0)} pts</div>
                 </div>
               );
             })}
