@@ -12,6 +12,7 @@ import {
   Medal, Target, ListChecks, TrendingUp, Users, Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatPoints } from "@/lib/formatPoints";
 
 type PredRow = {
   user_id: string;
@@ -89,9 +90,12 @@ function aggregate(rows: PredRow[], profiles: Profile[], filter: StageKey): Agg[
     const finished = list.filter((r) => r.match!.status === "finished" || (r.match!.score_a != null && r.match!.score_b != null));
     let total = 0, ex = 0, res = 0;
     for (const r of finished) {
-      total += r.points || 0;
-      if (r.points === 3) ex++;
-      else if (r.points === 1) res++;
+      total += Number(r.points) || 0;
+      const m = r.match!;
+      const exact = m.score_a != null && m.score_b != null && r.pred_a === m.score_a && r.pred_b === m.score_b;
+      const result_ok = !exact && m.score_a != null && m.score_b != null && Math.sign(r.pred_a - r.pred_b) === Math.sign(m.score_a - m.score_b);
+      if (exact) ex++;
+      else if (result_ok) res++;
     }
     const sorted = [...finished].sort(
       (a, b) => new Date(b.match!.kickoff_at).getTime() - new Date(a.match!.kickoff_at).getTime(),
@@ -315,8 +319,8 @@ export default function Ranking() {
               </div>
               <div className="text-right">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-1">Mis puntos</div>
-                <div className="text-3xl font-bold tabular-nums">{myStats.me.total_points}</div>
-                <div className="text-xs text-muted-foreground">{myStats.avg.toFixed(2)} prom/partido</div>
+                <div className="text-3xl font-bold tabular-nums">{formatPoints(myStats.me.total_points)}</div>
+                <div className="text-xs text-muted-foreground">{formatPoints(myStats.avg)} prom/partido</div>
               </div>
             </div>
 
@@ -371,7 +375,7 @@ export default function Ranking() {
                   <div className="font-medium text-sm truncate" title={b?.display_name}>
                     {b?.display_name ?? "—"}
                   </div>
-                  <div className="text-xs text-primary font-semibold">{b?.total_points ?? 0} pts</div>
+                  <div className="text-xs text-primary font-semibold">{formatPoints(b?.total_points ?? 0)} pts</div>
                 </div>
               );
             })}
@@ -454,7 +458,7 @@ export default function Ranking() {
                     </div>
 
                     <div className="text-right shrink-0">
-                      <div className="text-xl font-bold tabular-nums leading-none">{row.total_points}</div>
+                      <div className="text-xl font-bold tabular-nums leading-none">{formatPoints(row.total_points)}</div>
                       <div className="text-[10px] text-muted-foreground mt-0.5">pts</div>
                     </div>
                   </div>
@@ -485,7 +489,7 @@ export default function Ranking() {
                         </Badge>
                       ) : <span className="text-muted-foreground text-xs">—</span>}
                     </span>
-                    <span className="text-right font-bold text-base tabular-nums">{row.total_points}</span>
+                    <span className="text-right font-bold text-base tabular-nums">{formatPoints(row.total_points)}</span>
                   </div>
                 </div>
               );

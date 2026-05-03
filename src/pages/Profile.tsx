@@ -14,6 +14,7 @@ import {
   exportUserPredictionsPDF,
 } from "@/lib/predictionsExport";
 import { TournamentRules } from "@/components/TournamentRules";
+import { formatPoints } from "@/lib/formatPoints";
 
 export default function Profile() {
   const { user, isAdmin } = useAuth();
@@ -61,13 +62,13 @@ export default function Profile() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("predictions")
-        .select("points, match:matches(status, score_a, score_b)")
+        .select("points, pred_a, pred_b, match:matches(status, score_a, score_b)")
         .eq("user_id", user!.id);
       if (error) throw error;
       const finished = (data ?? []).filter((r: any) => r.match && (r.match.status === "finished" || (r.match.score_a != null && r.match.score_b != null)));
-      const total = finished.reduce((s: number, r: any) => s + (r.points || 0), 0);
-      const exact = finished.filter((r: any) => r.points === 3).length;
-      const result = finished.filter((r: any) => r.points === 1).length;
+      const total = finished.reduce((s: number, r: any) => s + Number(r.points || 0), 0);
+      const exact = finished.filter((r: any) => r.pred_a === r.match.score_a && r.pred_b === r.match.score_b).length;
+      const result = finished.filter((r: any) => !(r.pred_a === r.match.score_a && r.pred_b === r.match.score_b) && Math.sign(r.pred_a - r.pred_b) === Math.sign(r.match.score_a - r.match.score_b)).length;
       const n = finished.length;
       return {
         total_points: total,
@@ -76,7 +77,7 @@ export default function Profile() {
         finished: n,
         exact_pct: n ? Math.round((exact / n) * 100) : 0,
         result_pct: n ? Math.round((result / n) * 100) : 0,
-        avg: n ? (total / n).toFixed(2) : "0.00",
+        avg: n ? (total / n) : 0,
       };
     },
   });
@@ -103,12 +104,12 @@ export default function Profile() {
       </div>
 
       <div className="grid gap-4 grid-cols-2 sm:grid-cols-3">
-        <StatCard label="Puntos totales" value={stats?.total_points ?? 0} />
+        <StatCard label="Puntos totales" value={formatPoints(stats?.total_points ?? 0)} />
         <StatCard label="Plenos" value={stats?.exact_hits ?? 0} />
         <StatCard label="Resultado" value={stats?.result_hits ?? 0} />
         <StatCard label="% Exactos" value={`${stats?.exact_pct ?? 0}%`} />
         <StatCard label="% Resultado" value={`${stats?.result_pct ?? 0}%`} />
-        <StatCard label="Prom. / partido" value={stats?.avg ?? "0.00"} />
+        <StatCard label="Prom. / partido" value={formatPoints(stats?.avg ?? 0)} />
       </div>
 
       <Card>

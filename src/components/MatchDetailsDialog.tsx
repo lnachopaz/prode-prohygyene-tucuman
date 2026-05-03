@@ -20,6 +20,7 @@ import {
 import { BarChart3, Loader2, MapPin, Calendar } from "lucide-react";
 import { formatAR } from "@/lib/datetime";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
+import { formatPoints } from "@/lib/formatPoints";
 
 type MatchDetails = {
   id: string;
@@ -91,9 +92,9 @@ export function MatchDetailsDialog({ match }: { match: MatchDetails }) {
       .slice(0, 5);
   })();
 
-  const hits = data?.filter((p) => p.points === 3).length ?? 0;
-  const partial = data?.filter((p) => p.points === 1).length ?? 0;
-  const wrong = data?.filter((p) => p.points === 0).length ?? 0;
+  const hits = data?.filter((p) => p.pred_a === match.score_a && p.pred_b === match.score_b).length ?? 0;
+  const partial = data?.filter((p) => !(p.pred_a === match.score_a && p.pred_b === match.score_b) && Number(p.points) > 0).length ?? 0;
+  const wrong = data?.filter((p) => Number(p.points) === 0).length ?? 0;
 
   return (
     <Dialog>
@@ -203,18 +204,24 @@ export function MatchDetailsDialog({ match }: { match: MatchDetails }) {
                             {p.pred_a} - {p.pred_b}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Badge
-                              variant={p.points === 3 ? "default" : p.points === 1 ? "secondary" : "outline"}
-                              className={
-                                p.points === 3
-                                  ? "bg-success text-success-foreground hover:bg-success"
-                                  : p.points === 1
-                                  ? "bg-warning text-warning-foreground hover:bg-warning"
-                                  : ""
-                              }
-                            >
-                              +{p.points}
-                            </Badge>
+                            {(() => {
+                              const isExact = p.pred_a === match.score_a && p.pred_b === match.score_b;
+                              const hasPts = Number(p.points) > 0;
+                              return (
+                                <Badge
+                                  variant={isExact ? "default" : hasPts ? "secondary" : "outline"}
+                                  className={
+                                    isExact
+                                      ? "bg-success text-success-foreground hover:bg-success"
+                                      : hasPts
+                                      ? "bg-warning text-warning-foreground hover:bg-warning"
+                                      : ""
+                                  }
+                                >
+                                  +{formatPoints(p.points)}
+                                </Badge>
+                              );
+                            })()}
                           </TableCell>
                         </TableRow>
                       ))}

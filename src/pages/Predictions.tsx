@@ -21,6 +21,7 @@ import { es } from "date-fns/locale";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
 import { formatAR } from "@/lib/datetime";
 import { getMultiplierInfo } from "@/lib/scoring";
+import { formatPoints } from "@/lib/formatPoints";
 
 type Match = {
   id: string;
@@ -422,10 +423,11 @@ function MatchCard({
             <span className="font-bold">
               {prediction ? (
                 <span className={
-                  prediction.points === 3 ? "text-success" :
-                  prediction.points === 1 ? "text-warning" : "text-muted-foreground"
+                  Number(prediction.points) > 0
+                    ? (prediction.pred_a === match.score_a && prediction.pred_b === match.score_b ? "text-success" : "text-warning")
+                    : "text-muted-foreground"
                 }>
-                  +{prediction.points} pts
+                  +{formatPoints(prediction.points)} pts
                 </span>
               ) : (
                 <span className="text-muted-foreground">Sin pronóstico</span>
