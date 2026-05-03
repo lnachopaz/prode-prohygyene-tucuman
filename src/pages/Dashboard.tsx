@@ -202,7 +202,7 @@ export default function Dashboard() {
                   <span className="font-medium truncate">{u.display_name}</span>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="font-bold">{u.total_points} pts</div>
+                  <div className="font-bold">{formatPoints(u.total_points)} pts</div>
                   <div className="text-xs text-muted-foreground">{u.exact_hits} plenos</div>
                 </div>
               </div>
