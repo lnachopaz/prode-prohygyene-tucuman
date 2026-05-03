@@ -203,18 +203,24 @@ export function MatchDetailsDialog({ match }: { match: MatchDetails }) {
                             {p.pred_a} - {p.pred_b}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Badge
-                              variant={p.points === 3 ? "default" : p.points === 1 ? "secondary" : "outline"}
-                              className={
-                                p.points === 3
-                                  ? "bg-success text-success-foreground hover:bg-success"
-                                  : p.points === 1
-                                  ? "bg-warning text-warning-foreground hover:bg-warning"
-                                  : ""
-                              }
-                            >
-                              +{p.points}
-                            </Badge>
+                            {(() => {
+                              const isExact = p.pred_a === match.score_a && p.pred_b === match.score_b;
+                              const hasPts = Number(p.points) > 0;
+                              return (
+                                <Badge
+                                  variant={isExact ? "default" : hasPts ? "secondary" : "outline"}
+                                  className={
+                                    isExact
+                                      ? "bg-success text-success-foreground hover:bg-success"
+                                      : hasPts
+                                      ? "bg-warning text-warning-foreground hover:bg-warning"
+                                      : ""
+                                  }
+                                >
+                                  +{formatPoints(p.points)}
+                                </Badge>
+                              );
+                            })()}
                           </TableCell>
                         </TableRow>
                       ))}
