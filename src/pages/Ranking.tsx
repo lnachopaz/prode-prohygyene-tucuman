@@ -319,8 +319,8 @@ export default function Ranking() {
               </div>
               <div className="text-right">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-1">Mis puntos</div>
-                <div className="text-3xl font-bold tabular-nums">{myStats.me.total_points}</div>
-                <div className="text-xs text-muted-foreground">{myStats.avg.toFixed(2)} prom/partido</div>
+                <div className="text-3xl font-bold tabular-nums">{formatPoints(myStats.me.total_points)}</div>
+                <div className="text-xs text-muted-foreground">{formatPoints(myStats.avg)} prom/partido</div>
               </div>
             </div>
 
