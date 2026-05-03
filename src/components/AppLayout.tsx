@@ -27,10 +27,8 @@ export default function AppLayout() {
       <header className="border-b bg-card sticky top-0 z-40">
         <div className="container flex h-20 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <img src={logo} alt="ProHygiene" className="h-10 md:h-12 w-auto object-contain" />
-            <div className="hidden sm:block">
-              <p className="text-xs text-muted-foreground leading-none">PH Prode</p>
-              <p className="text-sm font-bold leading-tight">Mundial 2026</p>
+            <div className="bg-white rounded-md p-1.5 shadow-sm">
+              <img src={logo} alt="ProHygiene" className="h-7 md:h-8 w-auto object-contain" />
             </div>
           </div>
 

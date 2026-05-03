@@ -96,7 +96,9 @@ export default function Auth() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
-            <img src={logo} alt="ProHygiene" className="h-20 md:h-24 w-auto mb-4 object-contain" />
+            <div className="bg-white rounded-lg p-3 mb-4 shadow-sm">
+              <img src={logo} alt="ProHygiene" className="h-10 md:h-12 w-auto object-contain" />
+            </div>
           </div>
           <Card className="shadow-lg">
             <CardHeader className="items-center text-center">
