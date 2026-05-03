@@ -89,9 +89,12 @@ function aggregate(rows: PredRow[], profiles: Profile[], filter: StageKey): Agg[
     const finished = list.filter((r) => r.match!.status === "finished" || (r.match!.score_a != null && r.match!.score_b != null));
     let total = 0, ex = 0, res = 0;
     for (const r of finished) {
-      total += r.points || 0;
-      if (r.points === 3) ex++;
-      else if (r.points === 1) res++;
+      total += Number(r.points) || 0;
+      const m = r.match!;
+      const exact = m.score_a != null && m.score_b != null && r.pred_a === m.score_a && r.pred_b === m.score_b;
+      const result_ok = !exact && m.score_a != null && m.score_b != null && Math.sign(r.pred_a - r.pred_b) === Math.sign(m.score_a - m.score_b);
+      if (exact) ex++;
+      else if (result_ok) res++;
     }
     const sorted = [...finished].sort(
       (a, b) => new Date(b.match!.kickoff_at).getTime() - new Date(a.match!.kickoff_at).getTime(),
