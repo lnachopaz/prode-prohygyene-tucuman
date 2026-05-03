@@ -135,7 +135,7 @@ export default function Dashboard() {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={<Trophy className="h-4 w-4" />} label="Mis puntos" value={stats?.points ?? 0} />
+        <StatCard icon={<Trophy className="h-4 w-4" />} label="Mis puntos" value={formatPoints(stats?.points ?? 0)} />
         <StatCard icon={<Target className="h-4 w-4" />} label="Plenos" value={stats?.exact ?? 0} />
         <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Aciertos resultado" value={stats?.results ?? 0} />
         <StatCard icon={<ListChecks className="h-4 w-4" />} label="Pronósticos" value={`${stats?.predictionsCount ?? 0}/${stats?.totalMatches ?? 0}`} />
