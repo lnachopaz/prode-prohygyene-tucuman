@@ -489,7 +489,7 @@ export default function Ranking() {
                         </Badge>
                       ) : <span className="text-muted-foreground text-xs">—</span>}
                     </span>
-                    <span className="text-right font-bold text-base tabular-nums">{row.total_points}</span>
+                    <span className="text-right font-bold text-base tabular-nums">{formatPoints(row.total_points)}</span>
                   </div>
                 </div>
               );
