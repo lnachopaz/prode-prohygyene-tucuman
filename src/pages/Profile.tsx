@@ -104,12 +104,12 @@ export default function Profile() {
       </div>
 
       <div className="grid gap-4 grid-cols-2 sm:grid-cols-3">
-        <StatCard label="Puntos totales" value={stats?.total_points ?? 0} />
+        <StatCard label="Puntos totales" value={formatPoints(stats?.total_points ?? 0)} />
         <StatCard label="Plenos" value={stats?.exact_hits ?? 0} />
         <StatCard label="Resultado" value={stats?.result_hits ?? 0} />
         <StatCard label="% Exactos" value={`${stats?.exact_pct ?? 0}%`} />
         <StatCard label="% Resultado" value={`${stats?.result_pct ?? 0}%`} />
-        <StatCard label="Prom. / partido" value={stats?.avg ?? "0.00"} />
+        <StatCard label="Prom. / partido" value={formatPoints(stats?.avg ?? 0)} />
       </div>
 
       <Card>
