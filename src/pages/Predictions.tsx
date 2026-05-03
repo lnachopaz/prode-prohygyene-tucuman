@@ -21,6 +21,7 @@ import { es } from "date-fns/locale";
 import { getCountryFlagUrl } from "@/lib/countryFlags";
 import { formatAR } from "@/lib/datetime";
 import { getMultiplierInfo } from "@/lib/scoring";
+import { formatPoints } from "@/lib/formatPoints";
 
 type Match = {
   id: string;
