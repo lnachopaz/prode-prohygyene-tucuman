@@ -12,6 +12,7 @@ import {
   Medal, Target, ListChecks, TrendingUp, Users, Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatPoints } from "@/lib/formatPoints";
 
 type PredRow = {
   user_id: string;
