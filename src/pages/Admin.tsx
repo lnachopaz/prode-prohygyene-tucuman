@@ -18,6 +18,7 @@ import { es } from "date-fns/locale";
 import { formatAR, arLocalInputToUTC } from "@/lib/datetime";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatPoints } from "@/lib/formatPoints";
 
 export default function Admin() {
   return (
@@ -219,6 +220,13 @@ function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }
           {lockMode === "force_open" && <Badge className="text-[10px] bg-green-600 hover:bg-green-600">ABIERTO MANUAL</Badge>}
           {lockMode === "force_closed" && <Badge variant="destructive" className="text-[10px]">CERRADO MANUAL</Badge>}
         </div>
+        {match.status === "finished" && (
+          <p className="text-[11px] text-muted-foreground italic border-t pt-2">
+            ⚽ El resultado guardado refleja los <strong>90' reglamentarios</strong> (sin alargue ni penales).
+            La sincronización automática <strong>no sobrescribe partidos finalizados</strong>: si editás manualmente
+            el marcador, queda fijo para siempre.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
@@ -428,7 +436,7 @@ function UserRow({ user, onRename, onReject, onUnblock, onDelete }: any) {
           <span>📧 {user.email || "—"}</span>
           <Badge variant="outline">
             {user.rank ? `#${user.rank} en ranking` : "Sin ranking"}
-            {user.rank ? ` · ${user.total_points} pts` : ""}
+            {user.rank ? ` · ${formatPoints(user.total_points)} pts` : ""}
           </Badge>
           <Badge variant="outline">{user.predictions_count} pronósticos</Badge>
         </div>
@@ -738,7 +746,25 @@ function ExportRanking() {
 function TestModeAdmin() {
   return (
     <div className="space-y-6">
+      <SystemStatusCard />
       <BulkSimulator />
+      <SingleMatchSimulator />
+      <EndToEndChecklist />
+      <Card className="border-blue-500/40 bg-blue-500/5">
+        <CardHeader><CardTitle className="text-base">🔑 Credenciales de prueba</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <div className="p-2 rounded bg-background border text-xs">
+            <div className="font-semibold mb-1">Usuarios de prueba (para loguearte como uno):</div>
+            <div className="font-mono">test001@prode.test … test100@prode.test</div>
+            <div className="font-mono">contraseña: <strong>Prode2026!</strong></div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button asChild size="sm" variant="outline"><a href="/ranking" target="_blank" rel="noreferrer">Abrir Ranking ↗</a></Button>
+            <Button asChild size="sm" variant="outline"><a href="/" target="_blank" rel="noreferrer">Abrir Dashboard ↗</a></Button>
+            <Button asChild size="sm" variant="outline"><a href="/pronosticos" target="_blank" rel="noreferrer">Abrir Pronósticos ↗</a></Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -796,9 +822,13 @@ function PredictionsAdmin() {
   }).sort((a, b) => new Date(a.match.kickoff_at).getTime() - new Date(b.match.kickoff_at).getTime());
 
   const finished = filtered.filter((r) => r.match.status === "finished");
-  const totalPts = finished.reduce((s, r) => s + (r.points || 0), 0);
-  const exactos = finished.filter((r) => r.points === 3).length;
-  const aciertos = finished.filter((r) => r.points === 1).length;
+  const totalPts = finished.reduce((s, r) => s + Number(r.points || 0), 0);
+  const exactos = finished.filter((r) => r.pred_a === r.match.score_a && r.pred_b === r.match.score_b).length;
+  const aciertos = finished.filter((r) => {
+    const sameWinner = Math.sign(r.pred_a - r.pred_b) === Math.sign((r.match.score_a ?? 0) - (r.match.score_b ?? 0));
+    const isPleno = r.pred_a === r.match.score_a && r.pred_b === r.match.score_b;
+    return sameWinner && !isPleno;
+  }).length;
   const efectividad = finished.length ? Math.round(((exactos + aciertos) / finished.length) * 100) : 0;
 
   const filteredUsers = (users ?? []).filter((u: any) => {
@@ -823,7 +853,7 @@ function PredictionsAdmin() {
         `${r.pred_a}-${r.pred_b}`,
         realScore,
         m.status,
-        r.points ?? 0,
+        Number(r.points ?? 0).toFixed(2),
       ].join(","));
     }
     const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -870,9 +900,9 @@ function PredictionsAdmin() {
       {selectedUser && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Puntos</div><div className="text-2xl font-bold">{totalPts}</div></CardContent></Card>
-            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Plenos (3pts)</div><div className="text-2xl font-bold text-success">{exactos}</div></CardContent></Card>
-            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Resultado (1pt)</div><div className="text-2xl font-bold text-warning">{aciertos}</div></CardContent></Card>
+            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Puntos</div><div className="text-2xl font-bold">{formatPoints(totalPts)}</div></CardContent></Card>
+            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Plenos</div><div className="text-2xl font-bold text-success">{exactos}</div></CardContent></Card>
+            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Resultados</div><div className="text-2xl font-bold text-warning">{aciertos}</div></CardContent></Card>
             <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Efectividad</div><div className="text-2xl font-bold">{efectividad}%</div></CardContent></Card>
           </div>
 
@@ -925,11 +955,15 @@ function PredictionsAdmin() {
                         <div className="text-center font-mono">{r.pred_a}-{r.pred_b}</div>
                         <div className="text-center font-mono text-muted-foreground">{real}</div>
                         <div className="text-right font-bold">
-                          {m.status === "finished" ? (
-                            <span className={r.points === 3 ? "text-success" : r.points === 1 ? "text-warning" : "text-muted-foreground"}>
-                              {r.points ?? 0}
-                            </span>
-                          ) : (
+                          {m.status === "finished" ? (() => {
+                            const isPleno = r.pred_a === m.score_a && r.pred_b === m.score_b;
+                            const isAcierto = !isPleno && Math.sign(r.pred_a - r.pred_b) === Math.sign((m.score_a ?? 0) - (m.score_b ?? 0));
+                            return (
+                              <span className={isPleno ? "text-success" : isAcierto ? "text-warning" : "text-muted-foreground"}>
+                                {formatPoints(r.points)}
+                              </span>
+                            );
+                          })() : (
                             <span className="text-muted-foreground text-xs">—</span>
                           )}
                         </div>
@@ -1129,3 +1163,292 @@ export function BulkSimulator() {
   );
 }
 
+// ============================================================
+// ESTADO DEL SISTEMA (auto-refresh cada 5s)
+// ============================================================
+function SystemStatusCard() {
+  const { data: stats } = useQuery({
+    queryKey: ["test-system-status"],
+    refetchInterval: 5000,
+    queryFn: async () => {
+      const now = new Date().toISOString();
+      const [matches, predsAll, { data: windows }, { data: leaderTop }] = await Promise.all([
+        supabase.from("matches").select("id, status, kickoff_at, predictions_lock_mode, prediction_window_id"),
+        fetchAllPaginated<{ id: string }>(() => supabase.from("predictions").select("id")),
+        supabase.from("prediction_windows").select("*").gte("closes_at", now).order("closes_at").limit(1),
+        supabase.from("leaderboard").select("display_name, total_points").order("total_points", { ascending: false }).limit(1),
+      ]);
+      const ms = matches.data ?? [];
+      const finished = ms.filter((m: any) => m.status === "finished").length;
+      const live = ms.filter((m: any) => m.status === "live").length;
+      const scheduled = ms.filter((m: any) => m.status === "scheduled").length;
+      const openNow = ms.filter((m: any) => {
+        if (m.status !== "scheduled") return false;
+        if (m.predictions_lock_mode === "force_closed") return false;
+        if (m.predictions_lock_mode === "force_open") return true;
+        return new Date(m.kickoff_at).getTime() > Date.now() + 60 * 60 * 1000;
+      }).length;
+      return {
+        finished, live, scheduled, openNow,
+        predictions: predsAll.length,
+        nextWindow: windows?.[0],
+        leader: leaderTop?.[0],
+      };
+    },
+  });
+
+  return (
+    <Card className="border-primary/30">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Eye className="h-4 w-4 text-primary" /> Estado actual del sistema
+          <Badge variant="outline" className="ml-auto text-[10px]">Auto-refresh 5s</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-sm">
+        <StatBox label="Finalizados" value={stats?.finished} />
+        <StatBox label="En vivo" value={stats?.live} accent={(stats?.live ?? 0) > 0 ? "live" : undefined} />
+        <StatBox label="Programados" value={stats?.scheduled} />
+        <StatBox label="Abiertos ahora" value={stats?.openNow} accent="ok" />
+        <StatBox label="Pronósticos" value={stats?.predictions?.toLocaleString()} />
+        <StatBox
+          label="Líder ranking"
+          value={stats?.leader ? `${stats.leader.display_name} · ${formatPoints(stats.leader.total_points)}` : "—"}
+          small
+        />
+        {stats?.nextWindow && (
+          <div className="col-span-2 sm:col-span-3 lg:col-span-6 rounded border bg-muted/40 p-2 text-xs">
+            <span className="font-semibold">Próxima ventana cierra:</span>{" "}
+            <strong>{stats.nextWindow.label}</strong> · {formatAR(stats.nextWindow.closes_at, "EEE dd/MM HH:mm 'hs'")} (
+            {formatDistanceStrict(new Date(stats.nextWindow.closes_at), new Date(), { locale: es, addSuffix: true })})
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatBox({ label, value, accent, small }: { label: string; value: any; accent?: "ok" | "live"; small?: boolean }) {
+  const color = accent === "ok" ? "text-success" : accent === "live" ? "text-destructive" : "text-foreground";
+  return (
+    <div className="rounded border bg-background p-2">
+      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className={`${small ? "text-xs font-semibold truncate" : "text-lg font-bold"} ${color}`}>
+        {value ?? "…"}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// SIMULADOR DE 1 PARTIDO PUNTUAL
+// ============================================================
+function SingleMatchSimulator() {
+  const qc = useQueryClient();
+  const [selected, setSelected] = useState<string>("");
+  const [sa, setSa] = useState("");
+  const [sb, setSb] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [recalcAllBusy, setRecalcAllBusy] = useState(false);
+
+  const { data: matches } = useQuery({
+    queryKey: ["test-matches-list"],
+    queryFn: async () => {
+      const { data } = await supabase.from("matches").select("id, team_a, team_b, stage, kickoff_at, status, score_a, score_b").order("kickoff_at");
+      return data ?? [];
+    },
+  });
+
+  const m = matches?.find((x: any) => x.id === selected);
+
+  async function finalize() {
+    if (!m) return;
+    const pa = parseInt(sa, 10);
+    const pb = parseInt(sb, 10);
+    if (isNaN(pa) || isNaN(pb)) { toast.error("Ingresá un marcador válido"); return; }
+    setBusy(true);
+    const { error } = await supabase.from("matches").update({
+      status: "finished", score_a: pa, score_b: pb, test_mode: true,
+    }).eq("id", m.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success(`✅ ${m.team_a} ${pa}-${pb} ${m.team_b} finalizado`);
+    qc.invalidateQueries();
+  }
+
+  async function recalcAll() {
+    setRecalcAllBusy(true);
+    try {
+      const { data } = await supabase.from("matches").select("id").eq("status", "finished");
+      let n = 0;
+      for (const x of data ?? []) {
+        const { data: c } = await supabase.rpc("recalc_match_points", { _match_id: x.id });
+        n += c ?? 0;
+      }
+      toast.success(`🔄 Recalculadas ${n} predicciones de ${data?.length ?? 0} partidos`);
+      qc.invalidateQueries();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setRecalcAllBusy(false); }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Goal className="h-4 w-4" /> Simular 1 partido / Recalcular todo
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Select value={selected} onValueChange={setSelected}>
+          <SelectTrigger><SelectValue placeholder="Elegí un partido para finalizar manualmente" /></SelectTrigger>
+          <SelectContent className="max-h-80">
+            {matches?.map((x: any) => (
+              <SelectItem key={x.id} value={x.id}>
+                {formatAR(x.kickoff_at, "dd/MM HH:mm")} · {x.team_a} vs {x.team_b} ({x.status})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {m && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium flex-1">{m.team_a} vs {m.team_b}</span>
+            <Input type="number" className="w-16" placeholder="A" value={sa} onChange={(e) => setSa(e.target.value)} />
+            <span>-</span>
+            <Input type="number" className="w-16" placeholder="B" value={sb} onChange={(e) => setSb(e.target.value)} />
+            <Button size="sm" onClick={finalize} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Finalizar y recalcular
+            </Button>
+          </div>
+        )}
+        <div className="border-t pt-3">
+          <Button onClick={recalcAll} disabled={recalcAllBusy} variant="secondary" className="w-full">
+            {recalcAllBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Calculator className="h-4 w-4 mr-2" />}
+            Recalcular puntos de TODOS los partidos finalizados
+          </Button>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Útil después de cambiar multiplicadores o reglas de puntaje.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================
+// CHECKLIST DE VERIFICACIÓN END-TO-END
+// ============================================================
+function EndToEndChecklist() {
+  const { data: checks, refetch, isFetching } = useQuery({
+    queryKey: ["e2e-checks"],
+    queryFn: async () => {
+      const result: Array<{ key: string; label: string; ok: boolean; detail: string; link?: string }> = [];
+
+      // 1. Ranking calculado
+      const { data: lb } = await supabase.from("leaderboard").select("display_name, total_points").order("total_points", { ascending: false }).limit(1);
+      const top = lb?.[0];
+      result.push({
+        key: "ranking",
+        label: "Ranking con puntos > 0",
+        ok: !!top && Number(top.total_points) > 0,
+        detail: top ? `Líder: ${top.display_name} con ${formatPoints(top.total_points)} pts` : "Sin datos",
+        link: "/ranking",
+      });
+
+      // 2. Multiplicadores aplicados (busca un partido finalizado con multiplicador)
+      const { data: ms } = await supabase.from("matches").select("id, team_a, team_b, stage, score_a, score_b").eq("status", "finished");
+      const multMatch = (ms ?? []).find((m: any) => {
+        const s = (m.stage || "").toLowerCase();
+        const tA = (m.team_a || "").toLowerCase();
+        const tB = (m.team_b || "").toLowerCase();
+        const isUcl = s.includes("champions");
+        const hasArg = tA.includes("argentina") || tB.includes("argentina");
+        const hasStage = !isUcl && (s.includes("cuarto") || s.includes("quarter") || s.includes("semi") || s.match(/final/));
+        return hasArg || hasStage;
+      });
+      if (multMatch) {
+        const { data: anyPred } = await supabase.from("predictions")
+          .select("points, pred_a, pred_b").eq("match_id", multMatch.id).gt("points", 0).limit(1);
+        const p = anyPred?.[0];
+        result.push({
+          key: "mult",
+          label: "Multiplicadores activos en finalizados",
+          ok: !!p,
+          detail: p
+            ? `${multMatch.team_a} vs ${multMatch.team_b}: pred ${p.pred_a}-${p.pred_b} → ${formatPoints(p.points)} pts`
+            : `Sin pronósticos puntuados aún en ${multMatch.team_a} vs ${multMatch.team_b}`,
+        });
+      } else {
+        result.push({ key: "mult", label: "Multiplicadores activos en finalizados", ok: false, detail: "No hay partidos finalizados con multiplicador todavía" });
+      }
+
+      // 3. Bloqueo manual respetado
+      const { data: closed } = await supabase.from("matches").select("id").eq("predictions_lock_mode", "force_closed").limit(1);
+      result.push({
+        key: "lock",
+        label: "Hay partidos con bloqueo manual",
+        ok: (closed?.length ?? 0) > 0,
+        detail: (closed?.length ?? 0) > 0 ? "OK — el modo force_closed está siendo usado" : "Sin partidos en force_closed (probá uno desde la pestaña Partidos)",
+      });
+
+      // 4. Ventanas de pronóstico definidas
+      const { data: w } = await supabase.from("prediction_windows").select("id");
+      result.push({
+        key: "windows",
+        label: "Ventanas de pronóstico configuradas",
+        ok: (w?.length ?? 0) > 0,
+        detail: `${w?.length ?? 0} ventana(s) registrada(s)`,
+      });
+
+      // 5. Pronósticos cargados
+      const preds = await fetchAllPaginated<{ id: string }>(() => supabase.from("predictions").select("id"));
+      result.push({
+        key: "preds",
+        label: "Hay pronósticos cargados",
+        ok: preds.length > 0,
+        detail: `${preds.length.toLocaleString()} pronósticos en total`,
+      });
+
+      // 6. Top 5 dashboard == ranking
+      const { data: top5 } = await supabase.from("leaderboard").select("user_id, total_points").order("total_points", { ascending: false }).limit(5);
+      result.push({
+        key: "top5",
+        label: "Top 5 disponible",
+        ok: (top5?.length ?? 0) === 5,
+        detail: `${top5?.length ?? 0} usuarios en el top`,
+        link: "/",
+      });
+
+      return result;
+    },
+  });
+
+  return (
+    <Card className="border-blue-500/40 bg-blue-500/5">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          ✅ Verificación end-to-end
+          <Button size="sm" variant="ghost" className="ml-auto h-7" onClick={() => refetch()} disabled={isFetching}>
+            {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-1.5">
+        {checks?.map((c) => (
+          <div key={c.key} className="flex items-start gap-2 p-2 rounded border bg-background text-sm">
+            <span className="text-base leading-none mt-0.5">{c.ok ? "✅" : "⚠️"}</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium">{c.label}</div>
+              <div className="text-xs text-muted-foreground">{c.detail}</div>
+            </div>
+            {c.link && (
+              <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+                <a href={c.link} target="_blank" rel="noreferrer">Ver ↗</a>
+              </Button>
+            )}
+          </div>
+        )) ?? <Loader2 className="h-5 w-5 animate-spin text-primary" />}
+      </CardContent>
+    </Card>
+  );
+}

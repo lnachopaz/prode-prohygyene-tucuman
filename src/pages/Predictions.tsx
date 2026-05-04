@@ -366,73 +366,124 @@ function MatchCard({
 
   const multInfo = getMultiplierInfo(match.team_a, match.team_b, match.stage);
 
+  // Cuenta regresiva al cierre
+  const minutesToLock = Math.max(0, Math.floor((lockAt.getTime() - now.getTime()) / 60000));
+  const closingSoon = match.status === "scheduled" && !locked && minutesToLock <= 180 && minutesToLock > 0;
+
+  function countdownText() {
+    if (minutesToLock <= 0) return "Cerrado";
+    const h = Math.floor(minutesToLock / 60);
+    const m = minutesToLock % 60;
+    if (h > 24) return `Cierra en ${Math.floor(h / 24)}d ${h % 24}h`;
+    if (h > 0) return `Cierra en ${h}h ${m}m`;
+    return `Cierra en ${m}m`;
+  }
+
+  function adjust(side: "a" | "b", delta: number) {
+    if (locked) return;
+    const cur = parseInt(side === "a" ? a : b, 10);
+    const next = Math.max(0, (isNaN(cur) ? 0 : cur) + delta);
+    if (side === "a") setA(String(next)); else setB(String(next));
+  }
+
+  const isPleno =
+    prediction != null && match.status === "finished" &&
+    prediction.pred_a === match.score_a && prediction.pred_b === match.score_b;
+  const isAcierto =
+    prediction != null && match.status === "finished" && !isPleno &&
+    Math.sign(prediction.pred_a - prediction.pred_b) === Math.sign((match.score_a ?? 0) - (match.score_b ?? 0));
+
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center justify-between text-xs text-muted-foreground gap-2">
-          <span className="font-medium truncate">
-            {match.stage}
-            {match.group_name ? ` · ${match.group_name}` : ""}
-          </span>
-          <div className="flex items-center gap-1.5 shrink-0">
+    <Card className={`overflow-hidden transition-shadow ${match.status === "live" ? "border-destructive/50 shadow-md" : ""}`}>
+      <CardContent className="p-3 sm:p-4 space-y-3">
+        {/* Header: fase + grupo + estado */}
+        <div className="flex items-start justify-between gap-2 text-xs">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-foreground/80 truncate">
+              {match.stage}
+              {match.group_name ? ` · ${match.group_name}` : ""}
+            </div>
+            <div className="text-muted-foreground mt-0.5 flex items-center flex-wrap gap-x-2">
+              <span>📅 {formatAR(match.kickoff_at, "EEE dd/MM · HH:mm 'hs'")}</span>
+              {match.venue && <span className="truncate">📍 {match.venue}</span>}
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {statusBadge()}
             {multInfo && (
               <Badge
                 variant="default"
-                className="gap-1 bg-amber-500 hover:bg-amber-500 text-white"
-                title={`Multiplicador: ${multInfo.reasons.join(" + ")}`}
+                className="gap-1 bg-amber-500 hover:bg-amber-500 text-white text-[10px] py-0"
+                title={`Multiplicador ${multInfo.label} — ${multInfo.reasons.join(" + ")}`}
               >
                 <Sparkles className="h-3 w-3" />
                 {multInfo.label}
               </Badge>
             )}
-            {statusBadge()}
           </div>
         </div>
 
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        {/* Equipos + marcador */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3">
           <TeamSide name={match.team_a} flag={match.team_a_flag} align="end" />
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              min={0}
-              inputMode="numeric"
-              className="w-14 text-center text-lg font-bold"
-              value={a}
-              disabled={locked}
-              onChange={(e) => setA(e.target.value)}
-            />
-            <span className="text-muted-foreground font-bold">vs</span>
-            <Input
-              type="number"
-              min={0}
-              inputMode="numeric"
-              className="w-14 text-center text-lg font-bold"
-              value={b}
-              disabled={locked}
-              onChange={(e) => setB(e.target.value)}
-            />
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              <ScoreInput value={a} onChange={setA} onPlus={() => adjust("a", 1)} onMinus={() => adjust("a", -1)} disabled={locked} />
+              <span className="text-muted-foreground font-bold text-sm">vs</span>
+              <ScoreInput value={b} onChange={setB} onPlus={() => adjust("b", 1)} onMinus={() => adjust("b", -1)} disabled={locked} />
+            </div>
+            {match.status === "finished" && (
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Tu pronóstico</div>
+            )}
           </div>
           <TeamSide name={match.team_b} flag={match.team_b_flag} align="start" />
         </div>
 
+        {/* Resultado real cuando está finalizado */}
         {match.status === "finished" && (
-          <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
-            <span className="text-muted-foreground">
-              Resultado: <strong className="text-foreground">{match.score_a} - {match.score_b}</strong>
-            </span>
-            <span className="font-bold">
-              {prediction ? (
-                <span className={
-                  Number(prediction.points) > 0
-                    ? (prediction.pred_a === match.score_a && prediction.pred_b === match.score_b ? "text-success" : "text-warning")
-                    : "text-muted-foreground"
-                }>
+          <div className="rounded-md bg-muted px-3 py-2 space-y-1.5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground text-xs">Resultado final</span>
+              <strong className="text-foreground text-base tabular-nums">{match.score_a} - {match.score_b}</strong>
+            </div>
+            {prediction ? (
+              <div className="flex items-center justify-between">
+                <Badge
+                  variant="outline"
+                  className={
+                    isPleno ? "border-success text-success" :
+                    isAcierto ? "border-warning text-warning" :
+                    "text-muted-foreground"
+                  }
+                >
+                  {isPleno ? "🎯 Pleno" : isAcierto ? "✅ Resultado" : "❌ Sin acierto"}
+                </Badge>
+                <span className={`font-bold text-sm ${isPleno ? "text-success" : isAcierto ? "text-warning" : "text-muted-foreground"}`}>
                   +{formatPoints(prediction.points)} pts
                 </span>
-              ) : (
-                <span className="text-muted-foreground">Sin pronóstico</span>
-              )}
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground italic">No cargaste pronóstico</div>
+            )}
+          </div>
+        )}
+
+        {/* Marcador en vivo */}
+        {match.status === "live" && (
+          <div className="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 flex items-center justify-between text-sm">
+            <span className="text-destructive font-semibold flex items-center gap-1">
+              <span className="inline-block h-2 w-2 rounded-full bg-destructive animate-pulse" />
+              EN VIVO
             </span>
+            <strong className="tabular-nums text-base">{match.score_a ?? 0} - {match.score_b ?? 0}</strong>
+          </div>
+        )}
+
+        {/* Countdown al cierre */}
+        {match.status === "scheduled" && !locked && (
+          <div className={`text-xs flex items-center justify-between ${closingSoon ? "text-warning" : "text-muted-foreground"}`}>
+            <span>{countdownText()}</span>
+            {prediction && <span>Cargado: {prediction.pred_a}-{prediction.pred_b}</span>}
           </div>
         )}
 
@@ -462,16 +513,59 @@ function MatchCard({
   );
 }
 
+function ScoreInput({
+  value, onChange, onPlus, onMinus, disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onPlus: () => void;
+  onMinus: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <button
+        type="button"
+        onClick={onPlus}
+        disabled={disabled}
+        className="h-5 w-10 rounded-sm bg-muted hover:bg-muted/70 disabled:opacity-30 text-xs leading-none font-bold"
+        aria-label="Sumar gol"
+      >
+        ▲
+      </button>
+      <Input
+        type="number"
+        min={0}
+        inputMode="numeric"
+        className="w-12 sm:w-14 text-center text-xl font-bold h-10 px-1"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <button
+        type="button"
+        onClick={onMinus}
+        disabled={disabled}
+        className="h-5 w-10 rounded-sm bg-muted hover:bg-muted/70 disabled:opacity-30 text-xs leading-none font-bold"
+        aria-label="Restar gol"
+      >
+        ▼
+      </button>
+    </div>
+  );
+}
+
 function TeamSide({ name, flag, align }: { name: string; flag: string | null; align: "start" | "end" }) {
   return (
-    <div className={`flex items-center gap-2 min-w-0 ${align === "end" ? "justify-end" : "justify-start"}`}>
-      {align === "end" && <span className="font-semibold truncate">{name}</span>}
+    <div className={`flex flex-col items-center gap-1.5 min-w-0 ${align === "end" ? "sm:items-end" : "sm:items-start"}`}>
       {flag ? (
-        <img src={flag} alt={name} className="h-7 w-7 rounded-full object-cover bg-muted flex-shrink-0" />
+        <img src={flag} alt={name} className="h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover bg-muted ring-1 ring-border flex-shrink-0" />
       ) : (
-        <div className="h-7 w-7 rounded-full bg-muted flex-shrink-0" />
+        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-muted flex-shrink-0" />
       )}
-      {align === "start" && <span className="font-semibold truncate">{name}</span>}
+      <span className="font-semibold text-xs sm:text-sm text-center leading-tight line-clamp-2 max-w-full">
+        {name}
+      </span>
     </div>
   );
 }
