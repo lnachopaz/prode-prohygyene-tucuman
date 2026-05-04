@@ -874,9 +874,9 @@ function PredictionsAdmin() {
       {selectedUser && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Puntos</div><div className="text-2xl font-bold">{totalPts}</div></CardContent></Card>
-            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Plenos (3pts)</div><div className="text-2xl font-bold text-success">{exactos}</div></CardContent></Card>
-            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Resultado (1pt)</div><div className="text-2xl font-bold text-warning">{aciertos}</div></CardContent></Card>
+            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Puntos</div><div className="text-2xl font-bold">{formatPoints(totalPts)}</div></CardContent></Card>
+            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Plenos</div><div className="text-2xl font-bold text-success">{exactos}</div></CardContent></Card>
+            <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Resultados</div><div className="text-2xl font-bold text-warning">{aciertos}</div></CardContent></Card>
             <Card><CardContent className="p-3"><div className="text-xs text-muted-foreground">Efectividad</div><div className="text-2xl font-bold">{efectividad}%</div></CardContent></Card>
           </div>
 
