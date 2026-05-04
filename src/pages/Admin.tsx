@@ -18,6 +18,7 @@ import { es } from "date-fns/locale";
 import { formatAR, arLocalInputToUTC } from "@/lib/datetime";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatPoints } from "@/lib/formatPoints";
 
 export default function Admin() {
   return (
