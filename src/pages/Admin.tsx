@@ -746,7 +746,25 @@ function ExportRanking() {
 function TestModeAdmin() {
   return (
     <div className="space-y-6">
+      <SystemStatusCard />
       <BulkSimulator />
+      <SingleMatchSimulator />
+      <EndToEndChecklist />
+      <Card className="border-blue-500/40 bg-blue-500/5">
+        <CardHeader><CardTitle className="text-base">🔑 Credenciales de prueba</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <div className="p-2 rounded bg-background border text-xs">
+            <div className="font-semibold mb-1">Usuarios de prueba (para loguearte como uno):</div>
+            <div className="font-mono">test001@prode.test … test100@prode.test</div>
+            <div className="font-mono">contraseña: <strong>Prode2026!</strong></div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button asChild size="sm" variant="outline"><a href="/ranking" target="_blank" rel="noreferrer">Abrir Ranking ↗</a></Button>
+            <Button asChild size="sm" variant="outline"><a href="/" target="_blank" rel="noreferrer">Abrir Dashboard ↗</a></Button>
+            <Button asChild size="sm" variant="outline"><a href="/pronosticos" target="_blank" rel="noreferrer">Abrir Pronósticos ↗</a></Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
