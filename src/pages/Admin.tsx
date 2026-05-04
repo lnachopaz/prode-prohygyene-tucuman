@@ -429,7 +429,7 @@ function UserRow({ user, onRename, onReject, onUnblock, onDelete }: any) {
           <span>📧 {user.email || "—"}</span>
           <Badge variant="outline">
             {user.rank ? `#${user.rank} en ranking` : "Sin ranking"}
-            {user.rank ? ` · ${user.total_points} pts` : ""}
+            {user.rank ? ` · ${formatPoints(user.total_points)} pts` : ""}
           </Badge>
           <Badge variant="outline">{user.predictions_count} pronósticos</Badge>
         </div>
