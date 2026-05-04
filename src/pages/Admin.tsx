@@ -220,6 +220,13 @@ function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }
           {lockMode === "force_open" && <Badge className="text-[10px] bg-green-600 hover:bg-green-600">ABIERTO MANUAL</Badge>}
           {lockMode === "force_closed" && <Badge variant="destructive" className="text-[10px]">CERRADO MANUAL</Badge>}
         </div>
+        {match.status === "finished" && (
+          <p className="text-[11px] text-muted-foreground italic border-t pt-2">
+            ⚽ El resultado guardado refleja los <strong>90' reglamentarios</strong> (sin alargue ni penales).
+            La sincronización automática <strong>no sobrescribe partidos finalizados</strong>: si editás manualmente
+            el marcador, queda fijo para siempre.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
