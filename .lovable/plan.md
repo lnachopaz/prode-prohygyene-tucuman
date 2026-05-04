@@ -1,92 +1,86 @@
-## Objetivo
+## Respuesta a tu pregunta sobre tiempo extra
 
-1. Crear el usuario admin **Ignacio Paz** (ignacio.paz@prohygiene.com).
-2. Importar los **104 partidos del Mundial 2026** desde Football-Data.org (ya verificado: la API devuelve los 104 con fechas, equipos y escudos).
-3. Importar los partidos de **UCL de la próxima semana** (semifinales ida: Arsenal–Atlético 5/5 y Bayern–PSG 6/5).
-4. Configurar **ventanas de pronóstico** por fase para el Mundial con los plazos pedidos.
+La API de Football-Data devuelve dos marcadores: `fullTime` (90' reglamentarios) y `extraTime` (suplementario). Nuestra sincronización (`sync-live-matches`) usa **solo `fullTime`**, así que un partido que termina 1-1 en los 90' y 2-1 en alargue se guarda y se muestra como **1-1**. Los puntos se calculan sobre ese 1-1, que es lo que dicen las reglas.
 
----
-
-## 1. Crear admin Ignacio Paz
-
-Pasos:
-- Generar un código de invitación admin nuevo en `admin_invite_codes` (ej: `IGNACIO-PAZ-2026`).
-- Crear el usuario vía `auth.admin.createUser` con email confirmado, password `Batuque1277` y `raw_user_meta_data = { display_name: "Ignacio Paz", admin_code: "IGNACIO-PAZ-2026" }`. El trigger `handle_new_user` lo marca automáticamente como `admin` + `approved`.
-- Lo haré desde una edge function de un solo uso (`bootstrap-admin`) que use el `SUPABASE_SERVICE_ROLE_KEY`, la invocaré una vez y luego la dejo lista por si se necesita.
-
-> Alternativa: crearlo directo con el endpoint admin de Supabase desde el sandbox. Voy a usar la edge function porque es más limpio y queda auditable.
+Sobre la edición manual: la sync **solo toca partidos con estado `scheduled` o `live`**. En cuanto un partido pasa a `finished`, ya no se vuelve a sobrescribir desde la API. Entonces sí, podés cambiar manualmente el resultado desde el panel admin y queda fijo para siempre (a menos que vos mismo lo vuelvas a `live`/`scheduled`). Voy a dejar también un cartelito en la fila de admin aclarándolo.
 
 ---
 
-## 2. Ventanas de pronóstico (prediction_windows)
+## 1) Mejorar la UI de pronósticos (`src/pages/Predictions.tsx`)
 
-Mapeo exacto de fechas pedidas → ventanas que se aplican a cada partido por fase:
+Rediseñar `MatchCard` para que los equipos se vean grandes y claros, y mostrar mejor la info del partido:
 
-| ID ventana       | Label                  | Abre (ART)        | Cierra                                  | Aplica a stage                 |
-|------------------|------------------------|-------------------|-----------------------------------------|--------------------------------|
-| `wc-md1`         | Fecha 1 - Grupos       | 31/05 00:00       | 10/06 23:59                             | GROUP_STAGE matchday 1         |
-| `wc-md2`         | Fecha 2 - Grupos       | 11/06 00:00       | 1h antes del kickoff de cada partido*   | GROUP_STAGE matchday 2         |
-| `wc-md3`         | Fecha 3 - Grupos       | 18/06 00:00       | 1h antes del kickoff*                   | GROUP_STAGE matchday 3         |
-| `wc-r32`         | 16avos de final        | 24/06 00:00       | 1h antes del kickoff*                   | LAST_32                        |
-| `wc-r16`         | Octavos de final       | 28/06 00:00       | 1h antes del kickoff*                   | LAST_16                        |
-| `wc-qf`          | Cuartos de final       | 04/07 00:00       | 1h antes del kickoff*                   | QUARTER_FINALS                 |
-| `wc-sf`          | Semifinales            | 09/07 00:00       | 1h antes del kickoff*                   | SEMI_FINALS                    |
-| `wc-final`       | Final + 3er puesto     | 14/07 00:00       | 1h antes del kickoff*                   | FINAL + THIRD_PLACE            |
+- Banderas más grandes (h-12), nombre del equipo en 2 líneas si hace falta sin truncar, layout vertical en mobile cuando el ancho es chico (estamos en 384px).
+- Header del card más informativo: fase + grupo + venue + horario AR + cuenta regresiva al cierre del pronóstico ("cierra en 2h 15m").
+- Badge de multiplicador con tooltip clickeable (no solo `title=`) explicando "x2 Argentina + x1.5 Semifinal".
+- Inputs de marcador más grandes y con +/- al costado para mobile (más fácil que tipear).
+- Estado del partido más claro: verde "Abierto", amarillo "Cierra pronto", rojo "Cerrado", gris "Programado para más adelante".
+- Resultado final, cuando ya jugó, con badge "Pleno" / "Resultado" / "Sin acierto" además de los puntos.
 
-\* Como `prediction_windows` solo tiene `opens_at`/`closes_at` globales, voy a setear `closes_at` al inicio del último partido de la fase. El cierre 1h antes por partido ya lo hace el RLS automáticamente con `m.kickoff_at > now() + 1h` en modo `auto`. Así combinamos: la ventana abre la carga progresiva y el bloqueo 1h-pre-partido funciona por partido.
+## 2) Puntos con decimal en todo el front
 
-Todas se insertan en `prediction_windows` con `sort_order` 1–8.
+Ya tenemos `formatPoints()` y la DB ya guarda `numeric(6,2)`. Faltan reemplazos en `src/pages/Admin.tsx`:
 
----
+- `PredictionsAdmin` (líneas ~798-802, 873-876, 928-934): el total `totalPts`, los contadores de "exactos"/"aciertos" y la celda `r.points` usan comparaciones a 1 y 3 enteros. Cambiar a:
+  - `exactos` = donde `pred_a == score_a && pred_b == score_b`.
+  - `aciertos` = donde acierta ganador/empate sin ser pleno.
+  - Mostrar `formatPoints(totalPts)` y `formatPoints(r.points)`.
+  - Color del punto: si pleno → success; si acierto → warning; si 0 → muted.
+- Verificar `Profile.tsx`, `Ranking.tsx`, `Dashboard.tsx`, `MatchDetailsDialog.tsx`, `Predictions.tsx` (ya usan `formatPoints` por trabajo previo) y completar lo que haya quedado con `+N pts` sin formatear.
 
-## 3. Importar partidos
+## 3) Mejorar ejemplos del reglamento (`src/components/TournamentRules.tsx`)
 
-### 3a. Mundial (104 partidos)
+Reescribir el bloque de ejemplos para reflejar los multiplicadores reales (no hay multiplicador en dieciseisavos/octavos salvo Argentina, ni en Champions):
 
-- Llamada única a `GET /v4/competitions/WC/matches` (Football-Data).
-- Por cada partido inserto en `matches`:
-  - `external_id` = `fd-<id>`
-  - `stage` = mapeo legible: `GROUP_STAGE` → `Group Stage`, `LAST_32` → `Dieciseisavos`, `LAST_16` → `Octavos`, `QUARTER_FINALS` → `Cuartos`, `SEMI_FINALS` → `Semifinal`, `THIRD_PLACE` → `Tercer Puesto`, `FINAL` → `Final`. Esto importa porque `calc_points_match` detecta la fase por el texto del stage para aplicar multiplicadores (x1.2 knockout, x3 final).
-  - `group_name` = `GROUP_A`...`GROUP_L` (solo en fase de grupos).
-  - `team_a`, `team_b`, `team_a_flag`, `team_b_flag` desde la API.
-  - `kickoff_at` = `utcDate`.
-  - `prediction_window_id` = la ventana correspondiente según stage + matchday.
-  - `predictions_lock_mode` = `auto`.
-  - `test_mode` = `false`.
+```
+• Pleno en fase de grupos: 3 pts
+• Acierto de ganador en fase de grupos: 1 pt
+• Pleno de Argentina en fase de grupos: 3 × 2 = 6 pts
+• Pleno en cuartos de final: 3 × 1,2 = 3,6 pts
+• Pleno en cuartos de Argentina: 3 × 2 × 1,2 = 7,2 pts
+• Pleno en semifinal: 3 × 1,5 = 4,5 pts
+• Pleno en semifinal con Argentina: 3 × 2 × 1,5 = 9 pts
+• Pleno en la final: 3 × 2 = 6 pts
+• Pleno en la final con Argentina: 3 × 2 × 2 = 12 pts
+```
 
-### 3b. UCL próxima semana
+También aclarar arriba: "Los partidos de Champions League no tienen multiplicador de fase, sólo el x2 si juega Argentina".
 
-- Llamada a `GET /v4/competitions/CL/matches?dateFrom=2026-05-04&dateTo=2026-05-10` (devuelve Arsenal–Atlético y Bayern–PSG, ambas SEMI_FINALS).
-- Inserto igual que arriba pero con `stage = "UEFA Champions League - Semifinal"`, `prediction_window_id = NULL` (sin ventana específica → solo aplica el lock automático de 1h pre-kickoff).
+## 4) Rehacer el Modo Prueba (`src/pages/Admin.tsx` → `TestModeAdmin` + `BulkSimulator`)
 
-> Nota: como `calc_points_match` busca `%semi%` en el stage para aplicar el x1.2, también va a aplicar a estos partidos UCL. Si no querés multiplicador en UCL, avisame y filtro por nombre de competición en el stage.
+Reorganizar para que sea fácil verificar TODO el flujo de punta a punta. Estructura nueva del tab:
 
----
+**Card 1 — Estado actual del sistema**
+- Tarjetas grandes: usuarios reales, usuarios test, partidos (programados/en vivo/finalizados), pronósticos cargados, **fecha del próximo cierre de ventana**, **partidos abiertos para pronosticar ahora**. Auto-refresh cada 5s.
 
-## 4. Detalles técnicos
+**Card 2 — Acciones de simulación** (mantener pero mejoradas)
+- Avanzar 5 partidos (resultado aleatorio, marca `test_mode=true`).
+- Poner 3 partidos en vivo + Goleada en vivo.
+- **Nuevo:** "Simular 1 partido específico" — selector de partido + inputs de marcador + botón para finalizarlo y disparar recálculo.
+- **Nuevo:** "Recalcular TODO" — corre `recalc_match_points` sobre todos los `finished` y refresca leaderboard.
+- Reset total prueba.
 
-### Edge function `bootstrap-admin` (one-shot)
-- Crea el invite code y el usuario admin.
-- Devuelve `{ ok: true, user_id }`.
+**Card 3 — Verificación end-to-end** (checklist interactivo)
+Cada item con un botón "Verificar" que abre la página correspondiente y un check ✅/❌ basado en una query rápida:
+- Ranking calculado (top 1 tiene > 0 pts).
+- Top 5 del Dashboard coincide con `/ranking`.
+- Multiplicadores aplicándose (busca un partido finalizado con multiplicador y muestra los puntos calculados con el ejemplo: "Pleno en cuartos = 3,6 pts ✅").
+- Pronósticos cerrados respetan el lock (intenta un upsert con un usuario test sobre un partido locked; debería fallar).
+- Bloqueo manual `force_closed` funciona.
+- Realtime de marcadores OK (los inputs en `/pronosticos` se actualizan al cambiar un partido en vivo).
 
-### Edge function `import-fixtures` (one-shot)
-- Inserta las 8 ventanas (idempotente, `ON CONFLICT DO NOTHING`).
-- Trae los 104 partidos del Mundial + 2 UCL.
-- Inserta vía `upsert` por `external_id` para que sea reejecutable.
-- Devuelve resumen `{ wc_inserted, ucl_inserted, windows_inserted }`.
+**Card 4 — Credenciales y links rápidos** (lo que ya hay).
 
-### Archivos a crear
-- `supabase/functions/bootstrap-admin/index.ts`
-- `supabase/functions/import-fixtures/index.ts`
+## 5) Pequeño cartel informativo en `MatchAdminRow`
 
-### Sin cambios de schema
-- No hace falta migración: las tablas `prediction_windows`, `matches`, `admin_invite_codes` ya existen con todas las columnas necesarias.
-- El usuario se crea vía API admin de Supabase (no migración).
+Agregar bajo el selector de marcador, cuando `status === 'finished'`:
+*"El resultado guardado refleja los 90' reglamentarios. Una vez finalizado, la sincronización automática no lo sobrescribe; podés editarlo manualmente y queda fijo."*
 
----
+## Archivos a modificar
 
-## Pregunta abierta
+- `src/pages/Predictions.tsx` — rediseño del `MatchCard`.
+- `src/components/TournamentRules.tsx` — nuevos ejemplos.
+- `src/pages/Admin.tsx` — `PredictionsAdmin` (puntos decimales y colores), `MatchAdminRow` (cartel), `TestModeAdmin` + `BulkSimulator` (rediseño completo con verificación interactiva).
+- Repaso de `Ranking.tsx` / `Profile.tsx` / `Dashboard.tsx` / `MatchDetailsDialog.tsx` por si quedaron lugares con puntos enteros sin `formatPoints`.
 
-**Multiplicador UCL semifinales**: como tu sistema actual aplica x1.2 a cualquier stage que contenga "semi", los partidos UCL de la próxima semana van a sumar x1.2. ¿Lo dejo así (consistente con la regla actual) o el multiplicador solo debería aplicar al Mundial?
-
-Si querés que solo aplique al Mundial, lo más limpio es actualizar `calc_points_match` para que también valide que el stage sea "World Cup" (puedo hacerlo en una mini-migración). Decime qué preferís y lo incluyo al ejecutar.
+Sin cambios de DB ni de edge functions.
