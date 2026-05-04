@@ -828,7 +828,7 @@ function PredictionsAdmin() {
         `${r.pred_a}-${r.pred_b}`,
         realScore,
         m.status,
-        r.points ?? 0,
+        Number(r.points ?? 0).toFixed(2),
       ].join(","));
     }
     const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
