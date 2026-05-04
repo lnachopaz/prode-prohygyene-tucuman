@@ -46,17 +46,26 @@ export function TournamentRules() {
           <div className="mt-3">
             <p className="font-medium mb-1">Multiplicadores (se acumulan si coinciden):</p>
             <ul className="space-y-1 text-muted-foreground">
-              <li>• <Badge>x2</Badge> en partidos de Argentina</li>
+              <li>• <Badge>x2</Badge> en partidos de Argentina (Mundial)</li>
               <li>• <Badge>x2</Badge> en la final del Mundial</li>
               <li>• <Badge>x1,5</Badge> en semifinales y partido por el 3° puesto</li>
               <li>• <Badge>x1,2</Badge> en cuartos de final</li>
               <li>• Dieciseisavos y octavos: sin multiplicador de fase</li>
             </ul>
+            <p className="text-xs text-muted-foreground mt-2 italic">
+              En Champions League no aplican multiplicadores de fase. Sólo se aplica el x2 si juega Argentina (no corresponde acá, pero queda aclarado).
+            </p>
             <div className="mt-2 rounded-md border bg-muted/40 p-2 text-xs space-y-1">
-              <p className="font-medium text-foreground">Ejemplos:</p>
-              <p>• Pleno en un partido normal: <strong>3 pts</strong></p>
-              <p>• Pleno en cuartos de Argentina: 3 × 2 × 1,2 = <strong>7 pts</strong></p>
-              <p>• Pleno en la Final con Argentina: 3 × 2 × 2 = <strong>12 pts</strong></p>
+              <p className="font-medium text-foreground">Ejemplos de puntaje:</p>
+              <p>• Pleno en fase de grupos: <strong>3 pts</strong></p>
+              <p>• Acierto de ganador en grupos: <strong>1 pt</strong></p>
+              <p>• Pleno de Argentina en grupos: 3 × 2 = <strong>6 pts</strong></p>
+              <p>• Pleno en cuartos de final: 3 × 1,2 = <strong>3,6 pts</strong></p>
+              <p>• Pleno en cuartos de Argentina: 3 × 2 × 1,2 = <strong>7,2 pts</strong></p>
+              <p>• Pleno en semifinal: 3 × 1,5 = <strong>4,5 pts</strong></p>
+              <p>• Pleno en semifinal de Argentina: 3 × 2 × 1,5 = <strong>9 pts</strong></p>
+              <p>• Pleno en la final: 3 × 2 = <strong>6 pts</strong></p>
+              <p>• Pleno en la final con Argentina: 3 × 2 × 2 = <strong>12 pts</strong></p>
             </div>
           </div>
         </section>
