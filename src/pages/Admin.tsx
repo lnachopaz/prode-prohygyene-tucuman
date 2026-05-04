@@ -930,11 +930,15 @@ function PredictionsAdmin() {
                         <div className="text-center font-mono">{r.pred_a}-{r.pred_b}</div>
                         <div className="text-center font-mono text-muted-foreground">{real}</div>
                         <div className="text-right font-bold">
-                          {m.status === "finished" ? (
-                            <span className={r.points === 3 ? "text-success" : r.points === 1 ? "text-warning" : "text-muted-foreground"}>
-                              {r.points ?? 0}
-                            </span>
-                          ) : (
+                          {m.status === "finished" ? (() => {
+                            const isPleno = r.pred_a === m.score_a && r.pred_b === m.score_b;
+                            const isAcierto = !isPleno && Math.sign(r.pred_a - r.pred_b) === Math.sign((m.score_a ?? 0) - (m.score_b ?? 0));
+                            return (
+                              <span className={isPleno ? "text-success" : isAcierto ? "text-warning" : "text-muted-foreground"}>
+                                {formatPoints(r.points)}
+                              </span>
+                            );
+                          })() : (
                             <span className="text-muted-foreground text-xs">—</span>
                           )}
                         </div>
