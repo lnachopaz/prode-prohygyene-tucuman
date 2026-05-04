@@ -366,8 +366,6 @@ function MatchCard({
 
   const multInfo = getMultiplierInfo(match.team_a, match.team_b, match.stage);
 
-  const multInfo = getMultiplierInfo(match.team_a, match.team_b, match.stage);
-
   // Cuenta regresiva al cierre
   const minutesToLock = Math.max(0, Math.floor((lockAt.getTime() - now.getTime()) / 60000));
   const closingSoon = match.status === "scheduled" && !locked && minutesToLock <= 180 && minutesToLock > 0;
