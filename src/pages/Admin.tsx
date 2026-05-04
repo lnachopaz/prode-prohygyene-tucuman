@@ -796,9 +796,13 @@ function PredictionsAdmin() {
   }).sort((a, b) => new Date(a.match.kickoff_at).getTime() - new Date(b.match.kickoff_at).getTime());
 
   const finished = filtered.filter((r) => r.match.status === "finished");
-  const totalPts = finished.reduce((s, r) => s + (r.points || 0), 0);
-  const exactos = finished.filter((r) => r.points === 3).length;
-  const aciertos = finished.filter((r) => r.points === 1).length;
+  const totalPts = finished.reduce((s, r) => s + Number(r.points || 0), 0);
+  const exactos = finished.filter((r) => r.pred_a === r.match.score_a && r.pred_b === r.match.score_b).length;
+  const aciertos = finished.filter((r) => {
+    const sameWinner = Math.sign(r.pred_a - r.pred_b) === Math.sign((r.match.score_a ?? 0) - (r.match.score_b ?? 0));
+    const isPleno = r.pred_a === r.match.score_a && r.pred_b === r.match.score_b;
+    return sameWinner && !isPleno;
+  }).length;
   const efectividad = finished.length ? Math.round(((exactos + aciertos) / finished.length) * 100) : 0;
 
   const filteredUsers = (users ?? []).filter((u: any) => {
