@@ -365,7 +365,7 @@ function MatchCard({
     return <Badge variant="outline">{formatAR(match.kickoff_at, "HH:mm 'hs'")}</Badge>;
   };
 
-  const multInfo = getMultiplierInfo(match.team_a, match.team_b, match.stage);
+  const multInfo = getMultiplierInfo(match.team_a, match.team_b, match.stage, match.multiplier_override);
 
   // Cuenta regresiva al cierre
   const minutesToLock = Math.max(0, Math.floor((lockAt.getTime() - now.getTime()) / 60000));
@@ -457,7 +457,7 @@ function MatchCard({
                     "text-muted-foreground"
                   }
                 >
-                  {isPleno ? "🎯 Pleno" : isAcierto ? "✅ Resultado" : "❌ Sin acierto"}
+                  {isPleno ? "Pleno" : isAcierto ? "Resultado" : "Sin acierto"}
                 </Badge>
                 <span className={`font-bold text-sm ${isPleno ? "text-success" : isAcierto ? "text-warning" : "text-muted-foreground"}`}>
                   +{formatPoints(prediction.points)} pts
