@@ -38,6 +38,7 @@ type Match = {
   predictions_lock_mode?: "auto" | "force_open" | "force_closed";
   prediction_window_id: string | null;
   venue?: string | null;
+  multiplier_override?: number | null;
 };
 
 type PredictionWindow = {
@@ -364,7 +365,7 @@ function MatchCard({
     return <Badge variant="outline">{formatAR(match.kickoff_at, "HH:mm 'hs'")}</Badge>;
   };
 
-  const multInfo = getMultiplierInfo(match.team_a, match.team_b, match.stage);
+  const multInfo = getMultiplierInfo(match.team_a, match.team_b, match.stage, match.multiplier_override);
 
   // Cuenta regresiva al cierre
   const minutesToLock = Math.max(0, Math.floor((lockAt.getTime() - now.getTime()) / 60000));
@@ -393,8 +394,15 @@ function MatchCard({
     prediction != null && match.status === "finished" && !isPleno &&
     Math.sign(prediction.pred_a - prediction.pred_b) === Math.sign((match.score_a ?? 0) - (match.score_b ?? 0));
 
+  const isArgentina =
+    match.team_a.toLowerCase().includes("argentina") || match.team_b.toLowerCase().includes("argentina");
+
   return (
-    <Card className={`overflow-hidden transition-shadow ${match.status === "live" ? "border-destructive/50 shadow-md" : ""}`}>
+    <Card
+      className={`overflow-hidden transition-shadow ${
+        isArgentina ? "border-2 border-sky-400 shadow-[0_0_0_1px_hsl(var(--background)),0_4px_12px_-2px_rgb(56_189_248/0.4)]" : ""
+      } ${match.status === "live" ? "border-destructive/50 shadow-md" : ""}`}
+    >
       <CardContent className="p-3 sm:p-4 space-y-3">
         {/* Header: fase + grupo + estado */}
         <div className="flex items-start justify-between gap-2 text-xs">
@@ -404,8 +412,8 @@ function MatchCard({
               {match.group_name ? ` · ${match.group_name}` : ""}
             </div>
             <div className="text-muted-foreground mt-0.5 flex items-center flex-wrap gap-x-2">
-              <span>📅 {formatAR(match.kickoff_at, "EEE dd/MM · HH:mm 'hs'")}</span>
-              {match.venue && <span className="truncate">📍 {match.venue}</span>}
+              <span>{formatAR(match.kickoff_at, "EEE dd/MM · HH:mm 'hs'")}</span>
+              {match.venue && <span className="truncate">· {match.venue}</span>}
             </div>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
@@ -456,7 +464,7 @@ function MatchCard({
                     "text-muted-foreground"
                   }
                 >
-                  {isPleno ? "🎯 Pleno" : isAcierto ? "✅ Resultado" : "❌ Sin acierto"}
+                  {isPleno ? "Pleno" : isAcierto ? "Resultado" : "Sin acierto"}
                 </Badge>
                 <span className={`font-bold text-sm ${isPleno ? "text-success" : isAcierto ? "text-warning" : "text-muted-foreground"}`}>
                   +{formatPoints(prediction.points)} pts
@@ -556,14 +564,25 @@ function ScoreInput({
 }
 
 function TeamSide({ name, flag, align }: { name: string; flag: string | null; align: "start" | "end" }) {
+  const isArg = name.toLowerCase().includes("argentina");
   return (
     <div className={`flex flex-col items-center gap-1.5 min-w-0 ${align === "end" ? "sm:items-end" : "sm:items-start"}`}>
       {flag ? (
-        <img src={flag} alt={name} className="h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover bg-muted ring-1 ring-border flex-shrink-0" />
+        <img
+          src={flag}
+          alt={name}
+          className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover bg-muted flex-shrink-0 ${
+            isArg ? "ring-2 ring-sky-400" : "ring-1 ring-border"
+          }`}
+        />
       ) : (
         <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-muted flex-shrink-0" />
       )}
-      <span className="font-semibold text-xs sm:text-sm text-center leading-tight line-clamp-2 max-w-full">
+      <span
+        className={`font-semibold text-xs sm:text-sm text-center leading-tight line-clamp-2 max-w-full ${
+          isArg ? "text-sky-500" : ""
+        }`}
+      >
         {name}
       </span>
     </div>

@@ -11,7 +11,11 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Save, Plus, Trash2, Calculator, Lock, MailCheck, FileDown, FileText, FlaskConical, Play, Square, Goal, RotateCcw, Eye, FastForward, Zap, Search } from "lucide-react";
+import { Loader2, RefreshCw, Save, Plus, Trash2, Calculator, Lock, MailCheck, FileDown, FileText, FlaskConical, Play, Square, Goal, RotateCcw, Eye, FastForward, Zap, Search, Pencil, AlertTriangle } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { fetchAllPaginated } from "@/lib/fetchAll";
 import { format, formatDistanceStrict } from "date-fns";
 import { es } from "date-fns/locale";
@@ -939,35 +943,18 @@ function PredictionsAdmin() {
             <Card>
               <CardContent className="p-0">
                 <div className="divide-y">
-                  <div className="grid grid-cols-[120px_1fr_70px_70px_60px] gap-2 px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase">
-                    <span>Fecha</span><span>Partido</span><span className="text-center">Pron.</span><span className="text-center">Real</span><span className="text-right">Pts</span>
+                  <div className="grid grid-cols-[110px_1fr_70px_70px_55px_36px] gap-2 px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase">
+                    <span>Fecha</span><span>Partido</span><span className="text-center">Pron.</span><span className="text-center">Real</span><span className="text-right">Pts</span><span></span>
                   </div>
                   {filtered.map((r) => {
-                    const m = r.match;
-                    const real = m.score_a != null && m.score_b != null ? `${m.score_a}-${m.score_b}` : "—";
+                    const userName = users?.find((u: any) => u.id === selectedUser)?.display_name ?? "este usuario";
                     return (
-                      <div key={r.id} className="grid grid-cols-[120px_1fr_70px_70px_60px] gap-2 px-3 py-2 items-center text-sm">
-                        <div className="text-xs text-muted-foreground">
-                          <div>{formatAR(m.kickoff_at, "dd/MM HH:mm")}</div>
-                          <div className="text-[10px]">{m.stage}</div>
-                        </div>
-                        <div className="font-medium truncate">{m.team_a} vs {m.team_b}</div>
-                        <div className="text-center font-mono">{r.pred_a}-{r.pred_b}</div>
-                        <div className="text-center font-mono text-muted-foreground">{real}</div>
-                        <div className="text-right font-bold">
-                          {m.status === "finished" ? (() => {
-                            const isPleno = r.pred_a === m.score_a && r.pred_b === m.score_b;
-                            const isAcierto = !isPleno && Math.sign(r.pred_a - r.pred_b) === Math.sign((m.score_a ?? 0) - (m.score_b ?? 0));
-                            return (
-                              <span className={isPleno ? "text-success" : isAcierto ? "text-warning" : "text-muted-foreground"}>
-                                {formatPoints(r.points)}
-                              </span>
-                            );
-                          })() : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
-                        </div>
-                      </div>
+                      <EditablePredRow
+                        key={r.id}
+                        row={r}
+                        userId={selectedUser}
+                        userName={userName}
+                      />
                     );
                   })}
                   {filtered.length === 0 && (
@@ -979,6 +966,145 @@ function PredictionsAdmin() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function EditablePredRow({
+  row,
+  userId,
+  userName,
+}: {
+  row: any;
+  userId: string;
+  userName: string;
+}) {
+  const qc = useQueryClient();
+  const m = row.match;
+  const real = m.score_a != null && m.score_b != null ? `${m.score_a}-${m.score_b}` : "—";
+  const [editing, setEditing] = useState(false);
+  const [a, setA] = useState(String(row.pred_a));
+  const [b, setB] = useState(String(row.pred_b));
+  const [saving, setSaving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  function openEdit() {
+    setA(String(row.pred_a));
+    setB(String(row.pred_b));
+    setEditing(true);
+  }
+
+  async function doSave() {
+    const pa = parseInt(a, 10);
+    const pb = parseInt(b, 10);
+    if (isNaN(pa) || isNaN(pb) || pa < 0 || pb < 0) {
+      toast.error("Goles inválidos");
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase
+      .from("predictions")
+      .update({ pred_a: pa, pred_b: pb })
+      .eq("id", row.id);
+    if (!error && m.status === "finished") {
+      await supabase.rpc("recalc_match_points", { _match_id: m.id });
+    }
+    setSaving(false);
+    setConfirmOpen(false);
+    setEditing(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Pronóstico actualizado");
+      qc.invalidateQueries({ queryKey: ["pred-admin-rows", userId] });
+      qc.invalidateQueries({ queryKey: ["ranking-leaderboard"] });
+      qc.invalidateQueries({ queryKey: ["ranking-preds-all"] });
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-[110px_1fr_70px_70px_55px_36px] gap-2 px-3 py-2 items-center text-sm">
+      <div className="text-xs text-muted-foreground">
+        <div>{formatAR(m.kickoff_at, "dd/MM HH:mm")}</div>
+        <div className="text-[10px]">{m.stage}</div>
+      </div>
+      <div className="font-medium truncate">{m.team_a} vs {m.team_b}</div>
+      <div className="text-center font-mono">
+        {editing ? (
+          <div className="flex items-center justify-center gap-1">
+            <Input value={a} onChange={(e) => setA(e.target.value)} className="h-7 w-9 px-1 text-center" type="number" min={0} />
+            <span className="text-muted-foreground">-</span>
+            <Input value={b} onChange={(e) => setB(e.target.value)} className="h-7 w-9 px-1 text-center" type="number" min={0} />
+          </div>
+        ) : (
+          <>{row.pred_a}-{row.pred_b}</>
+        )}
+      </div>
+      <div className="text-center font-mono text-muted-foreground">{real}</div>
+      <div className="text-right font-bold">
+        {m.status === "finished" ? (() => {
+          const isPleno = row.pred_a === m.score_a && row.pred_b === m.score_b;
+          const isAcierto = !isPleno && Math.sign(row.pred_a - row.pred_b) === Math.sign((m.score_a ?? 0) - (m.score_b ?? 0));
+          return (
+            <span className={isPleno ? "text-success" : isAcierto ? "text-warning" : "text-muted-foreground"}>
+              {formatPoints(row.points)}
+            </span>
+          );
+        })() : (
+          <span className="text-muted-foreground text-xs">—</span>
+        )}
+      </div>
+      <div className="flex justify-end">
+        {editing ? (
+          <div className="flex gap-1">
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="default" className="h-7 px-2" disabled={saving}>
+                  {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-warning" />
+                    ¿Modificar pronóstico ajeno?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-2 text-sm">
+                      <p>
+                        Estás por cambiar el pronóstico de <strong>{userName}</strong> en el partido{" "}
+                        <strong>{m.team_a} vs {m.team_b}</strong>.
+                      </p>
+                      <div className="rounded-md border bg-muted/40 p-2 font-mono text-center">
+                        {row.pred_a}-{row.pred_b} → <strong className="text-foreground">{a}-{b}</strong>
+                      </div>
+                      {m.status === "finished" && (
+                        <p className="text-warning">
+                          El partido ya está finalizado. Los puntos se recalcularán automáticamente.
+                        </p>
+                      )}
+                      <p className="text-muted-foreground text-xs">
+                        Esta acción queda registrada y no se puede deshacer.
+                      </p>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={doSave}>Sí, modificar</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditing(false)} disabled={saving}>
+              ✕
+            </Button>
+          </div>
+        ) : (
+          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={openEdit} title="Editar pronóstico">
+            <Pencil className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
