@@ -943,35 +943,18 @@ function PredictionsAdmin() {
             <Card>
               <CardContent className="p-0">
                 <div className="divide-y">
-                  <div className="grid grid-cols-[120px_1fr_70px_70px_60px] gap-2 px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase">
-                    <span>Fecha</span><span>Partido</span><span className="text-center">Pron.</span><span className="text-center">Real</span><span className="text-right">Pts</span>
+                  <div className="grid grid-cols-[110px_1fr_70px_70px_55px_36px] gap-2 px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase">
+                    <span>Fecha</span><span>Partido</span><span className="text-center">Pron.</span><span className="text-center">Real</span><span className="text-right">Pts</span><span></span>
                   </div>
                   {filtered.map((r) => {
-                    const m = r.match;
-                    const real = m.score_a != null && m.score_b != null ? `${m.score_a}-${m.score_b}` : "—";
+                    const userName = users?.find((u: any) => u.id === selectedUser)?.display_name ?? "este usuario";
                     return (
-                      <div key={r.id} className="grid grid-cols-[120px_1fr_70px_70px_60px] gap-2 px-3 py-2 items-center text-sm">
-                        <div className="text-xs text-muted-foreground">
-                          <div>{formatAR(m.kickoff_at, "dd/MM HH:mm")}</div>
-                          <div className="text-[10px]">{m.stage}</div>
-                        </div>
-                        <div className="font-medium truncate">{m.team_a} vs {m.team_b}</div>
-                        <div className="text-center font-mono">{r.pred_a}-{r.pred_b}</div>
-                        <div className="text-center font-mono text-muted-foreground">{real}</div>
-                        <div className="text-right font-bold">
-                          {m.status === "finished" ? (() => {
-                            const isPleno = r.pred_a === m.score_a && r.pred_b === m.score_b;
-                            const isAcierto = !isPleno && Math.sign(r.pred_a - r.pred_b) === Math.sign((m.score_a ?? 0) - (m.score_b ?? 0));
-                            return (
-                              <span className={isPleno ? "text-success" : isAcierto ? "text-warning" : "text-muted-foreground"}>
-                                {formatPoints(r.points)}
-                              </span>
-                            );
-                          })() : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
-                        </div>
-                      </div>
+                      <EditablePredRow
+                        key={r.id}
+                        row={r}
+                        userId={selectedUser}
+                        userName={userName}
+                      />
                     );
                   })}
                   {filtered.length === 0 && (
