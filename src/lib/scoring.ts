@@ -17,6 +17,7 @@ export function getMatchMultiplier(
   team_a: string | null | undefined,
   team_b: string | null | undefined,
   stage: string | null | undefined,
+  override?: number | null,
 ): number {
   let mult = 1;
   const ta = (team_a ?? "").toLowerCase();
@@ -27,7 +28,10 @@ export function getMatchMultiplier(
     mult *= 2;
   }
 
-  if (isUCL(s)) return mult;
+  if (isUCL(s)) {
+    if (override && override > 0) mult *= override;
+    return mult;
+  }
 
   const isFinal =
     s.includes("final") &&
@@ -49,6 +53,8 @@ export function getMatchMultiplier(
   else if (isSemi) mult *= 1.5;
   else if (isQuarter) mult *= 1.2;
 
+  if (override && override > 0) mult *= override;
+
   return mult;
 }
 
@@ -67,14 +73,16 @@ export function getMultiplierInfo(
   team_a: string | null | undefined,
   team_b: string | null | undefined,
   stage: string | null | undefined,
+  override?: number | null,
 ): MultiplierInfo | null {
-  const mult = getMatchMultiplier(team_a, team_b, stage);
+  const mult = getMatchMultiplier(team_a, team_b, stage, override);
   if (mult === 1) return null;
   const reasons: string[] = [];
   const ta = (team_a ?? "").toLowerCase();
   const tb = (team_b ?? "").toLowerCase();
   const s = (stage ?? "").toLowerCase();
   if (ta.includes("argentina") || tb.includes("argentina")) reasons.push("Argentina");
+  if (override && override > 0) reasons.push(`Especial ${formatMultiplier(override)}`);
 
   if (!isUCL(s)) {
     const isFinal =
