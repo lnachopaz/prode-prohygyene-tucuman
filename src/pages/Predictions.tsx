@@ -564,14 +564,25 @@ function ScoreInput({
 }
 
 function TeamSide({ name, flag, align }: { name: string; flag: string | null; align: "start" | "end" }) {
+  const isArg = name.toLowerCase().includes("argentina");
   return (
     <div className={`flex flex-col items-center gap-1.5 min-w-0 ${align === "end" ? "sm:items-end" : "sm:items-start"}`}>
       {flag ? (
-        <img src={flag} alt={name} className="h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover bg-muted ring-1 ring-border flex-shrink-0" />
+        <img
+          src={flag}
+          alt={name}
+          className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover bg-muted flex-shrink-0 ${
+            isArg ? "ring-2 ring-sky-400" : "ring-1 ring-border"
+          }`}
+        />
       ) : (
         <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-muted flex-shrink-0" />
       )}
-      <span className="font-semibold text-xs sm:text-sm text-center leading-tight line-clamp-2 max-w-full">
+      <span
+        className={`font-semibold text-xs sm:text-sm text-center leading-tight line-clamp-2 max-w-full ${
+          isArg ? "text-sky-500" : ""
+        }`}
+      >
         {name}
       </span>
     </div>
