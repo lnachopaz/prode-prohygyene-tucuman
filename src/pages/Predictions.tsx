@@ -38,6 +38,7 @@ type Match = {
   predictions_lock_mode?: "auto" | "force_open" | "force_closed";
   prediction_window_id: string | null;
   venue?: string | null;
+  multiplier_override?: number | null;
 };
 
 type PredictionWindow = {
@@ -404,8 +405,8 @@ function MatchCard({
               {match.group_name ? ` · ${match.group_name}` : ""}
             </div>
             <div className="text-muted-foreground mt-0.5 flex items-center flex-wrap gap-x-2">
-              <span>📅 {formatAR(match.kickoff_at, "EEE dd/MM · HH:mm 'hs'")}</span>
-              {match.venue && <span className="truncate">📍 {match.venue}</span>}
+              <span>{formatAR(match.kickoff_at, "EEE dd/MM · HH:mm 'hs'")}</span>
+              {match.venue && <span className="truncate">· {match.venue}</span>}
             </div>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
