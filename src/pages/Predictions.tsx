@@ -394,8 +394,15 @@ function MatchCard({
     prediction != null && match.status === "finished" && !isPleno &&
     Math.sign(prediction.pred_a - prediction.pred_b) === Math.sign((match.score_a ?? 0) - (match.score_b ?? 0));
 
+  const isArgentina =
+    match.team_a.toLowerCase().includes("argentina") || match.team_b.toLowerCase().includes("argentina");
+
   return (
-    <Card className={`overflow-hidden transition-shadow ${match.status === "live" ? "border-destructive/50 shadow-md" : ""}`}>
+    <Card
+      className={`overflow-hidden transition-shadow ${
+        isArgentina ? "border-2 border-sky-400 shadow-[0_0_0_1px_hsl(var(--background)),0_4px_12px_-2px_rgb(56_189_248/0.4)]" : ""
+      } ${match.status === "live" ? "border-destructive/50 shadow-md" : ""}`}
+    >
       <CardContent className="p-3 sm:p-4 space-y-3">
         {/* Header: fase + grupo + estado */}
         <div className="flex items-start justify-between gap-2 text-xs">
