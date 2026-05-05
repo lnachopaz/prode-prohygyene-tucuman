@@ -11,7 +11,11 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Save, Plus, Trash2, Calculator, Lock, MailCheck, FileDown, FileText, FlaskConical, Play, Square, Goal, RotateCcw, Eye, FastForward, Zap, Search } from "lucide-react";
+import { Loader2, RefreshCw, Save, Plus, Trash2, Calculator, Lock, MailCheck, FileDown, FileText, FlaskConical, Play, Square, Goal, RotateCcw, Eye, FastForward, Zap, Search, Pencil, AlertTriangle } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { fetchAllPaginated } from "@/lib/fetchAll";
 import { format, formatDistanceStrict } from "date-fns";
 import { es } from "date-fns/locale";
