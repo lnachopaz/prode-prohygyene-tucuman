@@ -360,28 +360,6 @@ export default function Ranking() {
       )}
 
 
-      {/* Best per stage */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="text-xs font-semibold uppercase text-muted-foreground mb-3 flex items-center gap-2">
-            <Crown className="h-3.5 w-3.5" /> Mejor por fase
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {(["groups", "r16", "qf", "sf", "final"] as StageKey[]).map((k) => {
-              const b = bestByStage[k];
-              return (
-                <div key={k} className="rounded-md border bg-muted/30 p-2 text-center">
-                  <div className="text-[10px] uppercase text-muted-foreground">{STAGE_LABEL[k]}</div>
-                  <div className="font-medium text-sm truncate" title={b?.display_name}>
-                    {b?.display_name ?? "—"}
-                  </div>
-                  <div className="text-xs text-primary font-semibold">{formatPoints(b?.total_points ?? 0)} pts</div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Filter */}
       <Tabs value={filter} onValueChange={(v) => setFilter(v as StageKey)}>
@@ -498,6 +476,29 @@ export default function Ranking() {
             {current.length === 0 && (
               <div className="px-4 py-12 text-center text-muted-foreground text-sm">Aún no hay puntos en esta fase.</div>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Best per stage (moved below ranking list) */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="text-xs font-semibold uppercase text-muted-foreground mb-3 flex items-center gap-2">
+            <Crown className="h-3.5 w-3.5" /> Mejor por fase
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {(["groups", "r16", "qf", "sf", "final"] as StageKey[]).map((k) => {
+              const b = bestByStage[k];
+              return (
+                <div key={k} className="rounded-md border bg-muted/30 p-2 text-center">
+                  <div className="text-[10px] uppercase text-muted-foreground">{STAGE_LABEL[k]}</div>
+                  <div className="font-medium text-sm truncate" title={b?.display_name}>
+                    {b?.display_name ?? "—"}
+                  </div>
+                  <div className="text-xs text-primary font-semibold">{formatPoints(b?.total_points ?? 0)} pts</div>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
