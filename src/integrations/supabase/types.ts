@@ -89,6 +89,7 @@ export type Database = {
           group_name: string | null
           id: string
           kickoff_at: string
+          multiplier_override: number | null
           prediction_window_id: string | null
           predictions_lock_mode: Database["public"]["Enums"]["lock_mode"]
           score_a: number | null
@@ -110,6 +111,7 @@ export type Database = {
           group_name?: string | null
           id?: string
           kickoff_at: string
+          multiplier_override?: number | null
           prediction_window_id?: string | null
           predictions_lock_mode?: Database["public"]["Enums"]["lock_mode"]
           score_a?: number | null
@@ -131,6 +133,7 @@ export type Database = {
           group_name?: string | null
           id?: string
           kickoff_at?: string
+          multiplier_override?: number | null
           prediction_window_id?: string | null
           predictions_lock_mode?: Database["public"]["Enums"]["lock_mode"]
           score_a?: number | null
@@ -323,6 +326,19 @@ export type Database = {
     Functions: {
       calc_points: {
         Args: { pa: number; pb: number; sa: number; sb: number }
+        Returns: number
+      }
+      calc_points_full: {
+        Args: {
+          override: number
+          pa: number
+          pb: number
+          sa: number
+          sb: number
+          stage: string
+          team_a: string
+          team_b: string
+        }
         Returns: number
       }
       calc_points_match: {
