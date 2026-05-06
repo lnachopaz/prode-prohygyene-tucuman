@@ -36,6 +36,14 @@ type MatchDetails = {
   venue?: string | null;
 };
 
+type DialogProps = {
+  match: MatchDetails;
+  /** Si true, oculta el resultado real y los puntos (estados ABIERTO/CERRADO/EN JUEGO). */
+  hideRealScore?: boolean;
+  /** Texto del botón disparador. */
+  triggerLabel?: string;
+};
+
 type PredRow = {
   user_id: string;
   pred_a: number;
@@ -44,7 +52,7 @@ type PredRow = {
   display_name: string;
 };
 
-export function MatchDetailsDialog({ match }: { match: MatchDetails }) {
+export function MatchDetailsDialog({ match, hideRealScore = false, triggerLabel = "Ver detalles" }: DialogProps) {
   const { data, isLoading } = useQuery({
     queryKey: ["match-details", match.id],
     queryFn: async () => {
