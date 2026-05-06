@@ -385,7 +385,7 @@ function UsersAdmin() {
                 )}
                 <Button size="sm" onClick={() => setStatus(u.id, "approved")}>Aprobar</Button>
                 <Button size="sm" variant="outline" onClick={() => setStatus(u.id, "rejected")}>Rechazar</Button>
-                <Button size="sm" variant="destructive" onClick={() => deleteUser(u.id, u.display_name)}>Eliminar</Button>
+                <Button size="sm" variant="destructive" onClick={() => deleteUser(u.id, u.display_name, false)}>Eliminar</Button>
               </CardContent>
             </Card>
           ))
@@ -401,7 +401,7 @@ function UsersAdmin() {
             onRename={(n: string) => rename(u.id, n)}
             onReject={() => setStatus(u.id, "rejected")}
             onUnblock={() => setStatus(u.id, "approved")}
-            onDelete={() => deleteUser(u.id, u.display_name)}
+            onDelete={() => deleteUser(u.id, u.display_name, !!u.is_admin)}
           />
         ))}
       </div>
