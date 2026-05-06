@@ -749,8 +749,34 @@ function ExportRanking() {
 // MODO PRUEBA: simulador rápido para validar el flujo end-to-end
 // ============================================================
 function TestModeAdmin() {
+  const [seeding, setSeeding] = useState(false);
+  async function seedBots() {
+    setSeeding(true);
+    const { data, error } = await supabase.functions.invoke("seed-test-bots", {
+      body: { match_id: "dae6d78e-7ff7-4281-a307-b8230e486bc4" },
+    });
+    setSeeding(false);
+    if (error) return toast.error(error.message);
+    const created = (data as any)?.created?.length ?? 0;
+    toast.success(`✅ ${created} bots con pronóstico cargado para Bayern vs PSG`);
+  }
   return (
     <div className="space-y-6">
+      <Card className="border-purple-500/40 bg-purple-500/5">
+        <CardHeader><CardTitle className="text-base">🤖 Bots para UCL Bayern vs PSG</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="text-muted-foreground">
+            Crea 10 cuentas bot (<code>bot001..bot010@prode.test</code> · pwd <code>Prode2026!</code>) ya
+            aprobadas, y carga 10 pronósticos distintos para el partido Bayern vs PSG de mañana.
+            El partido tiene multiplicador especial: <strong>Bayern x2</strong> + <strong>partido x1.2</strong>
+            (acertar a favor de Bayern = x2.4, a favor de PSG = x1.2).
+          </p>
+          <Button size="sm" onClick={seedBots} disabled={seeding}>
+            {seeding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FlaskConical className="h-4 w-4 mr-2" />}
+            Generar 10 bots para UCL
+          </Button>
+        </CardContent>
+      </Card>
       <SystemStatusCard />
       <BulkSimulator />
       <SingleMatchSimulator />
