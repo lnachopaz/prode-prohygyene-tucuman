@@ -39,6 +39,7 @@ type Match = {
   prediction_window_id: string | null;
   venue?: string | null;
   multiplier_override?: number | null;
+  team_multiplier_override?: { team: string; mult: number } | null;
 };
 
 type PredictionWindow = {
@@ -196,10 +197,18 @@ export default function Predictions() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Pronósticos</h1>
         <p className="text-muted-foreground">Cargá tus marcadores antes del cierre (1 hora antes del partido).</p>
+      </div>
+
+      <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+        <strong className="text-foreground">Importante:</strong>{" "}
+        <span className="text-muted-foreground">
+          Los resultados oficiales (90 min) y el cálculo de puntos se cargarán y mostrarán
+          únicamente al finalizar cada partido.
+        </span>
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
