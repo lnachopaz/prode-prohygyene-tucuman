@@ -100,6 +100,7 @@ export type Database = {
           team_a_flag: string | null
           team_b: string
           team_b_flag: string | null
+          team_multiplier_override: Json | null
           test_mode: boolean
           updated_at: string
           venue: string | null
@@ -122,6 +123,7 @@ export type Database = {
           team_a_flag?: string | null
           team_b: string
           team_b_flag?: string | null
+          team_multiplier_override?: Json | null
           test_mode?: boolean
           updated_at?: string
           venue?: string | null
@@ -144,6 +146,7 @@ export type Database = {
           team_a_flag?: string | null
           team_b?: string
           team_b_flag?: string | null
+          team_multiplier_override?: Json | null
           test_mode?: boolean
           updated_at?: string
           venue?: string | null
@@ -324,35 +327,68 @@ export type Database = {
       }
     }
     Functions: {
+      admin_delete_prediction: {
+        Args: { _prediction_id: string }
+        Returns: undefined
+      }
       calc_points: {
         Args: { pa: number; pb: number; sa: number; sb: number }
         Returns: number
       }
-      calc_points_full: {
-        Args: {
-          override: number
-          pa: number
-          pb: number
-          sa: number
-          sb: number
-          stage: string
-          team_a: string
-          team_b: string
-        }
-        Returns: number
-      }
-      calc_points_match: {
-        Args: {
-          pa: number
-          pb: number
-          sa: number
-          sb: number
-          stage: string
-          team_a: string
-          team_b: string
-        }
-        Returns: number
-      }
+      calc_points_full:
+        | {
+            Args: {
+              override: number
+              pa: number
+              pb: number
+              sa: number
+              sb: number
+              stage: string
+              team_a: string
+              team_b: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              override: number
+              pa: number
+              pb: number
+              sa: number
+              sb: number
+              stage: string
+              team_a: string
+              team_b: string
+              team_mult?: Json
+            }
+            Returns: number
+          }
+      calc_points_match:
+        | {
+            Args: {
+              pa: number
+              pb: number
+              sa: number
+              sb: number
+              stage: string
+              team_a: string
+              team_b: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              pa: number
+              pb: number
+              sa: number
+              sb: number
+              stage: string
+              team_a: string
+              team_b: string
+              team_mult?: Json
+            }
+            Returns: number
+          }
       delete_user_completely: { Args: { _user_id: string }; Returns: undefined }
       has_role: {
         Args: {

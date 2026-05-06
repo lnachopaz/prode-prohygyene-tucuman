@@ -1,86 +1,93 @@
-## Respuesta a tu pregunta sobre tiempo extra
+## Resumen
 
-La API de Football-Data devuelve dos marcadores: `fullTime` (90' reglamentarios) y `extraTime` (suplementario). Nuestra sincronización (`sync-live-matches`) usa **solo `fullTime`**, así que un partido que termina 1-1 en los 90' y 2-1 en alargue se guarda y se muestra como **1-1**. Los puntos se calculan sobre ese 1-1, que es lo que dicen las reglas.
-
-Sobre la edición manual: la sync **solo toca partidos con estado `scheduled` o `live`**. En cuanto un partido pasa a `finished`, ya no se vuelve a sobrescribir desde la API. Entonces sí, podés cambiar manualmente el resultado desde el panel admin y queda fijo para siempre (a menos que vos mismo lo vuelvas a `live`/`scheduled`). Voy a dejar también un cartelito en la fila de admin aclarándolo.
+Refactor profundo en 5 ejes: estados de partido + UI, sincronización solo al finalizar, multiplicadores combinados (equipo + partido) para el test de UCL, bots de prueba, y permisos absolutos de admin.
 
 ---
 
-## 1) Mejorar la UI de pronósticos (`src/pages/Predictions.tsx`)
+## 1) Estados del partido y UI (`src/pages/Predictions.tsx` + `MatchDetailsDialog.tsx`)
 
-Rediseñar `MatchCard` para que los equipos se vean grandes y claros, y mostrar mejor la info del partido:
+Se define un único `derivedState` por partido con cuatro valores:
 
-- Banderas más grandes (h-12), nombre del equipo en 2 líneas si hace falta sin truncar, layout vertical en mobile cuando el ancho es chico (estamos en 384px).
-- Header del card más informativo: fase + grupo + venue + horario AR + cuenta regresiva al cierre del pronóstico ("cierra en 2h 15m").
-- Badge de multiplicador con tooltip clickeable (no solo `title=`) explicando "x2 Argentina + x1.5 Semifinal".
-- Inputs de marcador más grandes y con +/- al costado para mobile (más fácil que tipear).
-- Estado del partido más claro: verde "Abierto", amarillo "Cierra pronto", rojo "Cerrado", gris "Programado para más adelante".
-- Resultado final, cuando ya jugó, con badge "Pleno" / "Resultado" / "Sin acierto" además de los puntos.
+- **ABIERTO**: `status='scheduled'` y aún no se llegó al `lockAt` (1h antes del kickoff o ventana).
+- **CERRADO**: `status='scheduled'` pero ya se pasó el `lockAt` (o `force_closed`, o ventana cerrada). Inputs bloqueados, botón "Ver pronósticos de los demás".
+- **EN JUEGO**: `status='live'`. Marco rojo (`border-2 border-destructive`), badge animado "EN JUEGO", inputs bloqueados, **el resultado real NO se muestra** (se oculta `score_a/score_b` aunque exista). Sí se muestra "Ver pronósticos de los demás".
+- **FINALIZADO**: `status='finished'`. Se muestra resultado oficial (90'), puntos del usuario y `MatchDetailsDialog` con la tabla completa.
 
-## 2) Puntos con decimal en todo el front
+Cambios concretos:
+- Quitar el bloque "Marcador en vivo" (líneas 480-488 de `Predictions.tsx`) — en EN JUEGO no se muestra score.
+- En estado CERRADO, mostrar el componente `MatchDetailsDialog` (que ya lista pronósticos de todos) con un botón "Ver qué pronosticaron los demás". Adaptar `MatchDetailsDialog` para aceptar `hideRealScore` y ocultar columnas/sección de "Resultado real" / "Aciertos" cuando el partido aún no terminó.
+- Banner global arriba de la página: *"Los resultados oficiales (90 min) y el cálculo de puntos se cargarán y mostrarán únicamente al finalizar cada partido."*
 
-Ya tenemos `formatPoints()` y la DB ya guarda `numeric(6,2)`. Faltan reemplazos en `src/pages/Admin.tsx`:
+## 2) Sincronización: solo al finalizar (`supabase/functions/sync-live-matches/index.ts` + Admin.tsx)
 
-- `PredictionsAdmin` (líneas ~798-802, 873-876, 928-934): el total `totalPts`, los contadores de "exactos"/"aciertos" y la celda `r.points` usan comparaciones a 1 y 3 enteros. Cambiar a:
-  - `exactos` = donde `pred_a == score_a && pred_b == score_b`.
-  - `aciertos` = donde acierta ganador/empate sin ser pleno.
-  - Mostrar `formatPoints(totalPts)` y `formatPoints(r.points)`.
-  - Color del punto: si pleno → success; si acierto → warning; si 0 → muted.
-- Verificar `Profile.tsx`, `Ranking.tsx`, `Dashboard.tsx`, `MatchDetailsDialog.tsx`, `Predictions.tsx` (ya usan `formatPoints` por trabajo previo) y completar lo que haya quedado con `+N pts` sin formatear.
+- **Eliminar de la UI** todos los botones de "Sincronizar marcadores en vivo" y "Forzar sync ahora" (Admin.tsx líneas 80-84 y 546). Mantener la pestaña Sync solo como **logs de auditoría** + exports.
+- **Reescribir el edge function `sync-live-matches`** y renombrarlo conceptualmente a flujo "finalize-only":
+  - Ya no consulta partidos `status='live'` ni `scheduled+30min`.
+  - Selecciona partidos con `external_id` cuyo `kickoff_at` esté entre `now() - 4h` y `now() - 100min` (ya pasaron los 90' + descuento + posibles alargues), `status != 'finished'` y `test_mode=false`.
+  - Por cada uno consulta Football-Data; si el upstream `status === 'FINISHED'`, extrae **estrictamente** `score.regularTime.home / regularTime.away` (ignorando `extraTime` y `penalties`). Si `regularTime` no viene, usa `fullTime` solo si `match.score.duration === 'REGULAR'`. Si fue a alargue, sigue tomando `regularTime`.
+  - Marca `status='finished'` y guarda los goles.
+  - Doble pase de seguridad: cada partido elegible se chequea, si la primera llamada no lo encuentra finalizado, se reintenta una segunda vez en la misma corrida tras 8s (la app no usa webhooks ni minuto a minuto).
+- **Cron**: sustituir cualquier polling agresivo por un cron `pg_cron` cada 15 minutos que invoque solo el finalize. (Si no existe, dejarlo documentado en una migración opcional.)
+- En frontend, `useLiveMatches` deja de hacer smart polling de 60s; pasa a un único refetch cada 5 min y on focus, ya que no hay actualizaciones en vivo.
 
-## 3) Mejorar ejemplos del reglamento (`src/components/TournamentRules.tsx`)
+## 3) Bots y multiplicadores UCL (script + migración)
 
-Reescribir el bloque de ejemplos para reflejar los multiplicadores reales (no hay multiplicador en dieciseisavos/octavos salvo Argentina, ni en Champions):
+**Bots (10 cuentas)**:
+- Crear edge function `seed-test-bots` (admin-only, valida JWT + `has_role admin`) que:
+  1. Crea 10 usuarios `bot01..bot10@prode.test` con `Prode2026!` vía `auth.admin.createUser`, `display_name="🤖 Bot 0X"`, status `approved`.
+  2. Inserta 10 pronósticos distintos para el partido **Bayern vs PSG (id `dae6d78e-...`)** del 2026-05-06.
+- Botón "Crear 10 bots para UCL mañana" en la pestaña Modo Prueba.
 
+**Multiplicadores combinados**:
+El usuario pide: Bayern x2 (porque el equipo es Bayern) + partido x1.2 (multiplicador del partido). El esquema actual `multiplier_override` solo tiene un número y ya está en 2. Necesitamos dos campos.
+
+- **Migración SQL**: agregar columna `team_multiplier_override jsonb` a `matches` con forma `{"team":"FC Bayern München","mult":2}` (o `null`). Mantener `multiplier_override` como multiplicador del partido entero.
+- Para el partido Bayern vs PSG (id `dae6d78e-...`) setear: `multiplier_override = 1.2`, `team_multiplier_override = {"team":"FC Bayern München","mult":2}`.
+- Actualizar `calc_points_match` y `calc_points_full` para multiplicar por **ambos** (excluyendo en UCL la lógica genérica de fase, como ya hace hoy). Resultado para Bayern: `base × 2 (equipo) × 1.2 (partido) = base × 2.4`. Para PSG: `base × 1.2`.
+- Reflejar lo mismo en `src/lib/scoring.ts` (`getMatchMultiplier` / `getMultiplierInfo`) para que el badge en la tarjeta muestre `x2.4` con tooltip "Bayern x2 + Especial partido x1.2".
+- Para el resto de los partidos no cambia nada (no tienen `team_multiplier_override` y `multiplier_override` queda null/none).
+
+**Formato de puntos**: `formatPoints` ya hace exactamente lo pedido (entero → "5", decimal → "5,2"). Verificar que se use en todas partes (Ranking, Dashboard, Profile, MatchDetailsDialog, Predictions). Auditar y reemplazar cualquier `toFixed(2)` o `Number(p.points)` crudo restante.
+
+## 4) Permisos de Administrador — Poder Absoluto (`Admin.tsx` + RLS + RPC)
+
+Hoy faltan dos cosas:
+
+- **Borrar/bloquear admins**: en `UserRow` (líneas 419-450) los botones "Eliminar" y "Bloquear" se ocultan si `user.is_admin`. Quitar esa restricción. Mantener solo la guardia de seguridad ya implementada en `delete_user_completely` ("no podés eliminarte a vos mismo"). Confirmar con `AlertDialog` doble cuando el target es admin.
+- **Bloquear admin**: usar `set_user_status(user_id, 'rejected')` también para admins.
+- **Modificar pronósticos en cualquier estado**: `EditablePredRow` ya existe y respeta el flujo correcto. Verificar que la policy `predictions_admin_all` permite `UPDATE` (sí lo hace). Permitir también borrado individual con un botón Trash + confirmación.
+- **Modificar resultados manualmente**: `MatchAdminRow` ya lo permite. No requiere cambios.
+
+## 5) Banner informativo en Pronósticos
+
+Insertar al tope de `Predictions.tsx`, debajo del título, un `Alert` (variante `default` con `Info` icon):
+
+> "Los resultados oficiales (90 min) y el cálculo de puntos se cargarán y mostrarán únicamente al finalizar cada partido."
+
+---
+
+## Detalle técnico (resumen para implementación)
+
+```text
+Archivos a modificar:
+  src/pages/Predictions.tsx          (estados, banner, ocultar score en live, "ver detalles" en cerrado)
+  src/components/MatchDetailsDialog.tsx (prop hideRealScore + botón configurable)
+  src/pages/Admin.tsx                (quitar botones sync, permitir borrar/bloquear admins, botón bots)
+  src/lib/scoring.ts                 (combinar team + match override)
+  src/hooks/useLiveMatches.ts        (sin polling agresivo)
+  supabase/functions/sync-live-matches/index.ts  (finalize-only + regularTime estricto + doble pase)
+
+Archivos a crear:
+  supabase/functions/seed-test-bots/index.ts     (10 bots + 10 predicciones UCL)
+
+Migraciones SQL:
+  - ALTER TABLE matches ADD COLUMN team_multiplier_override jsonb;
+  - CREATE OR REPLACE FUNCTION calc_points_match(...) — incluir team_multiplier_override;
+  - CREATE OR REPLACE FUNCTION calc_points_full(...) — pasar team_multiplier_override;
+  - UPDATE trigger recalc_predictions_for_match para disparar también si cambia team_multiplier_override.
+  - (data) UPDATE matches SET multiplier_override=1.2, team_multiplier_override='{"team":"FC Bayern München","mult":2}' WHERE id='dae6d78e-7ff7-4281-a307-b8230e486bc4';
 ```
-• Pleno en fase de grupos: 3 pts
-• Acierto de ganador en fase de grupos: 1 pt
-• Pleno de Argentina en fase de grupos: 3 × 2 = 6 pts
-• Pleno en cuartos de final: 3 × 1,2 = 3,6 pts
-• Pleno en cuartos de Argentina: 3 × 2 × 1,2 = 7,2 pts
-• Pleno en semifinal: 3 × 1,5 = 4,5 pts
-• Pleno en semifinal con Argentina: 3 × 2 × 1,5 = 9 pts
-• Pleno en la final: 3 × 2 = 6 pts
-• Pleno en la final con Argentina: 3 × 2 × 2 = 12 pts
-```
 
-También aclarar arriba: "Los partidos de Champions League no tienen multiplicador de fase, sólo el x2 si juega Argentina".
+## Pregunta abierta
 
-## 4) Rehacer el Modo Prueba (`src/pages/Admin.tsx` → `TestModeAdmin` + `BulkSimulator`)
-
-Reorganizar para que sea fácil verificar TODO el flujo de punta a punta. Estructura nueva del tab:
-
-**Card 1 — Estado actual del sistema**
-- Tarjetas grandes: usuarios reales, usuarios test, partidos (programados/en vivo/finalizados), pronósticos cargados, **fecha del próximo cierre de ventana**, **partidos abiertos para pronosticar ahora**. Auto-refresh cada 5s.
-
-**Card 2 — Acciones de simulación** (mantener pero mejoradas)
-- Avanzar 5 partidos (resultado aleatorio, marca `test_mode=true`).
-- Poner 3 partidos en vivo + Goleada en vivo.
-- **Nuevo:** "Simular 1 partido específico" — selector de partido + inputs de marcador + botón para finalizarlo y disparar recálculo.
-- **Nuevo:** "Recalcular TODO" — corre `recalc_match_points` sobre todos los `finished` y refresca leaderboard.
-- Reset total prueba.
-
-**Card 3 — Verificación end-to-end** (checklist interactivo)
-Cada item con un botón "Verificar" que abre la página correspondiente y un check ✅/❌ basado en una query rápida:
-- Ranking calculado (top 1 tiene > 0 pts).
-- Top 5 del Dashboard coincide con `/ranking`.
-- Multiplicadores aplicándose (busca un partido finalizado con multiplicador y muestra los puntos calculados con el ejemplo: "Pleno en cuartos = 3,6 pts ✅").
-- Pronósticos cerrados respetan el lock (intenta un upsert con un usuario test sobre un partido locked; debería fallar).
-- Bloqueo manual `force_closed` funciona.
-- Realtime de marcadores OK (los inputs en `/pronosticos` se actualizan al cambiar un partido en vivo).
-
-**Card 4 — Credenciales y links rápidos** (lo que ya hay).
-
-## 5) Pequeño cartel informativo en `MatchAdminRow`
-
-Agregar bajo el selector de marcador, cuando `status === 'finished'`:
-*"El resultado guardado refleja los 90' reglamentarios. Una vez finalizado, la sincronización automática no lo sobrescribe; podés editarlo manualmente y queda fijo."*
-
-## Archivos a modificar
-
-- `src/pages/Predictions.tsx` — rediseño del `MatchCard`.
-- `src/components/TournamentRules.tsx` — nuevos ejemplos.
-- `src/pages/Admin.tsx` — `PredictionsAdmin` (puntos decimales y colores), `MatchAdminRow` (cartel), `TestModeAdmin` + `BulkSimulator` (rediseño completo con verificación interactiva).
-- Repaso de `Ranking.tsx` / `Profile.tsx` / `Dashboard.tsx` / `MatchDetailsDialog.tsx` por si quedaron lugares con puntos enteros sin `formatPoints`.
-
-Sin cambios de DB ni de edge functions.
+El partido **Arsenal vs Atlético** (5 may, ya finalizado, con `multiplier_override=1.2`) lo dejo tal cual (tu pedido anterior). ¿Confirmás?
