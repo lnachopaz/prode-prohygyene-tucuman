@@ -361,20 +361,36 @@ function MatchCard({
     onSaved();
   }
 
+  // Estado derivado consolidado: ABIERTO | CERRADO | EN_JUEGO | FINALIZADO
+  type DerivedState = "ABIERTO" | "CERRADO" | "EN_JUEGO" | "FINALIZADO";
+  const derivedState: DerivedState =
+    match.status === "finished" ? "FINALIZADO" :
+    match.status === "live" ? "EN_JUEGO" :
+    locked ? "CERRADO" : "ABIERTO";
+
   const statusBadge = () => {
-    if (match.status === "live") return <Badge className="bg-destructive text-destructive-foreground">EN VIVO</Badge>;
-    if (match.status === "finished") return <Badge variant="secondary">Finalizado</Badge>;
+    if (derivedState === "EN_JUEGO")
+      return (
+        <Badge className="gap-1 bg-destructive text-destructive-foreground hover:bg-destructive">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+          EN JUEGO
+        </Badge>
+      );
+    if (derivedState === "FINALIZADO") return <Badge variant="secondary">Finalizado</Badge>;
     if (lockedByAdmin) return <Badge variant="destructive" className="gap-1"><Lock className="h-3 w-3" /> Bloqueado por admin</Badge>;
     if (forcedOpen && timeLocked) return <Badge className="gap-1 bg-green-600 hover:bg-green-600">Reabierto por admin</Badge>;
     if (windowNotYetOpen && predWindow)
       return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Abre {formatAR(predWindow.opens_at, "dd/MM HH:mm")}</Badge>;
     if (windowClosed && predWindow)
       return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Ventana cerrada</Badge>;
-    if (locked) return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Cerrado</Badge>;
+    if (derivedState === "CERRADO") return <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Cerrado</Badge>;
     return <Badge variant="outline">{formatAR(match.kickoff_at, "HH:mm 'hs'")}</Badge>;
   };
 
-  const multInfo = getMultiplierInfo(match.team_a, match.team_b, match.stage, match.multiplier_override);
+  const multInfo = getMultiplierInfo(
+    match.team_a, match.team_b, match.stage,
+    match.multiplier_override, match.team_multiplier_override,
+  );
 
   // Cuenta regresiva al cierre
   const minutesToLock = Math.max(0, Math.floor((lockAt.getTime() - now.getTime()) / 60000));
@@ -410,7 +426,7 @@ function MatchCard({
     <Card
       className={`overflow-hidden transition-shadow ${
         isArgentina ? "border-2 border-sky-400 shadow-[0_0_0_1px_hsl(var(--background)),0_4px_12px_-2px_rgb(56_189_248/0.4)]" : ""
-      } ${match.status === "live" ? "border-destructive/50 shadow-md" : ""}`}
+      } ${derivedState === "EN_JUEGO" ? "border-2 border-destructive shadow-[0_0_0_1px_hsl(var(--background)),0_4px_12px_-2px_hsl(var(--destructive)/0.5)]" : ""}`}
     >
       <CardContent className="p-3 sm:p-4 space-y-3">
         {/* Header: fase + grupo + estado */}
@@ -457,10 +473,10 @@ function MatchCard({
         </div>
 
         {/* Resultado real cuando está finalizado */}
-        {match.status === "finished" && (
+        {derivedState === "FINALIZADO" && (
           <div className="rounded-md bg-muted px-3 py-2 space-y-1.5">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground text-xs">Resultado final</span>
+              <span className="text-muted-foreground text-xs">Resultado final (90')</span>
               <strong className="text-foreground text-base tabular-nums">{match.score_a} - {match.score_b}</strong>
             </div>
             {prediction ? (
@@ -485,26 +501,23 @@ function MatchCard({
           </div>
         )}
 
-        {/* Marcador en vivo */}
-        {match.status === "live" && (
-          <div className="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 flex items-center justify-between text-sm">
-            <span className="text-destructive font-semibold flex items-center gap-1">
-              <span className="inline-block h-2 w-2 rounded-full bg-destructive animate-pulse" />
-              EN VIVO
-            </span>
-            <strong className="tabular-nums text-base">{match.score_a ?? 0} - {match.score_b ?? 0}</strong>
+        {/* EN JUEGO: ocultar resultado, solo banner */}
+        {derivedState === "EN_JUEGO" && (
+          <div className="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-xs text-destructive italic text-center">
+            Partido en curso. El resultado oficial (90 min) y los puntos se mostrarán al finalizar.
           </div>
         )}
 
-        {/* Countdown al cierre */}
-        {match.status === "scheduled" && !locked && (
+        {/* Countdown al cierre (solo ABIERTO) */}
+        {derivedState === "ABIERTO" && (
           <div className={`text-xs flex items-center justify-between ${closingSoon ? "text-warning" : "text-muted-foreground"}`}>
             <span>{countdownText()}</span>
             {prediction && <span>Cargado: {prediction.pred_a}-{prediction.pred_b}</span>}
           </div>
         )}
 
-        {!locked && (
+        {/* Botón guardar (solo ABIERTO) */}
+        {derivedState === "ABIERTO" && (
           <Button
             size="sm"
             className={`w-full ${prediction ? "bg-warning text-warning-foreground hover:bg-warning/90" : ""}`}
@@ -522,8 +535,17 @@ function MatchCard({
           </Button>
         )}
 
-        {match.status === "finished" && (
-          <MatchDetailsDialog match={match} />
+        {/* Ver pronósticos de los demás (CERRADO / EN JUEGO / FINALIZADO) */}
+        {derivedState !== "ABIERTO" && (
+          <MatchDetailsDialog
+            match={match}
+            hideRealScore={derivedState !== "FINALIZADO"}
+            triggerLabel={
+              derivedState === "FINALIZADO"
+                ? "Ver detalles"
+                : "Ver pronósticos de los demás"
+            }
+          />
         )}
       </CardContent>
     </Card>
