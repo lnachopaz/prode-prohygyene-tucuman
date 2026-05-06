@@ -54,7 +54,6 @@ export default function Admin() {
 
 function MatchesAdmin() {
   const qc = useQueryClient();
-  const [syncing, setSyncing] = useState(false);
   const { data: matches, isLoading } = useQuery({
     queryKey: ["admin-matches"],
     queryFn: async () => {
@@ -64,24 +63,14 @@ function MatchesAdmin() {
     },
   });
 
-  async function syncFromApi() {
-    setSyncing(true);
-    const { data, error } = await supabase.functions.invoke("sync-live-matches");
-    setSyncing(false);
-    if (error) return toast.error(error.message);
-    toast.success(`Sincronizado: ${(data as any)?.updated ?? 0} partidos`);
-    qc.invalidateQueries({ queryKey: ["admin-matches"] });
-    qc.invalidateQueries({ queryKey: ["matches"] });
-    qc.invalidateQueries({ queryKey: ["sync-logs"] });
-  }
-
   return (
     <div className="space-y-4">
+      <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+        <strong>Sincronización automática:</strong> ya no se sincroniza minuto a minuto. Los resultados
+        oficiales (90') se cargan únicamente <strong>cuando el partido ya finalizó</strong>, vía Football-Data.org.
+        Si necesitás algo manual, editá el marcador acá abajo (queda fijo y nunca se sobrescribe).
+      </div>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={syncFromApi} disabled={syncing}>
-          {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-          Sincronizar marcadores en vivo
-        </Button>
         <NewMatchDialog onCreated={() => qc.invalidateQueries({ queryKey: ["admin-matches"] })} />
       </div>
 
@@ -354,8 +343,12 @@ function UsersAdmin() {
     qc.invalidateQueries({ queryKey: ["admin-pending-detailed"] });
   }
 
-  async function deleteUser(userId: string, displayName: string) {
-    if (!confirm(`¿Eliminar definitivamente a "${displayName}"? Se borrarán todos sus datos (pronósticos, perfil y cuenta). El email quedará libre para registrarse de nuevo.`)) return;
+  async function deleteUser(userId: string, displayName: string, isAdmin: boolean) {
+    const warn = isAdmin
+      ? `⚠️ "${displayName}" es ADMIN. ¿Eliminar definitivamente su cuenta y todos sus datos?\n\nEsta acción no se puede deshacer.`
+      : `¿Eliminar definitivamente a "${displayName}"? Se borrarán todos sus datos (pronósticos, perfil y cuenta). El email quedará libre para registrarse de nuevo.`;
+    if (!confirm(warn)) return;
+    if (isAdmin && !confirm(`Confirmá una vez más: eliminar al admin "${displayName}".`)) return;
     const { error } = await supabase.rpc("delete_user_completely", { _user_id: userId });
     if (error) return toast.error(error.message);
     toast.success("Usuario eliminado");
@@ -392,7 +385,7 @@ function UsersAdmin() {
                 )}
                 <Button size="sm" onClick={() => setStatus(u.id, "approved")}>Aprobar</Button>
                 <Button size="sm" variant="outline" onClick={() => setStatus(u.id, "rejected")}>Rechazar</Button>
-                <Button size="sm" variant="destructive" onClick={() => deleteUser(u.id, u.display_name)}>Eliminar</Button>
+                <Button size="sm" variant="destructive" onClick={() => deleteUser(u.id, u.display_name, false)}>Eliminar</Button>
               </CardContent>
             </Card>
           ))
@@ -408,7 +401,7 @@ function UsersAdmin() {
             onRename={(n: string) => rename(u.id, n)}
             onReject={() => setStatus(u.id, "rejected")}
             onUnblock={() => setStatus(u.id, "approved")}
-            onDelete={() => deleteUser(u.id, u.display_name)}
+            onDelete={() => deleteUser(u.id, u.display_name, !!u.is_admin)}
           />
         ))}
       </div>
@@ -426,15 +419,13 @@ function UserRow({ user, onRename, onReject, onUnblock, onDelete }: any) {
           <Button size="sm" variant="outline" onClick={() => onRename(name)}>Guardar</Button>
           {user.is_admin && <Badge>Admin</Badge>}
           {user.status === "rejected" && <Badge variant="destructive">Bloqueado</Badge>}
-          {user.status === "approved" && !user.is_admin && (
+          {user.status === "approved" && (
             <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
           )}
           {user.status === "rejected" && (
             <Button size="sm" onClick={onUnblock}>Desbloquear</Button>
           )}
-          {!user.is_admin && (
-            <Button size="sm" variant="destructive" onClick={onDelete}>Eliminar</Button>
-          )}
+          <Button size="sm" variant="destructive" onClick={onDelete}>Eliminar</Button>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span>📧 {user.email || "—"}</span>
@@ -527,11 +518,13 @@ function SyncAdmin() {
     },
   });
 
-  async function runSync() {
+  async function runFinalizeNow() {
     const { error } = await supabase.functions.invoke("sync-live-matches");
     if (error) return toast.error(error.message);
-    toast.success("Sync ejecutado");
+    toast.success("Chequeo de partidos finalizados ejecutado");
     qc.invalidateQueries({ queryKey: ["sync-logs"] });
+    qc.invalidateQueries({ queryKey: ["admin-matches"] });
+    qc.invalidateQueries({ queryKey: ["matches"] });
   }
 
   return (
@@ -539,11 +532,19 @@ function SyncAdmin() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <RefreshCw className="h-4 w-4" /> Logs de sincronización
+            <RefreshCw className="h-4 w-4" /> Sincronización (solo al finalizar)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button size="sm" onClick={runSync}><RefreshCw className="h-4 w-4 mr-2" />Forzar sync ahora</Button>
+          <p className="text-xs text-muted-foreground">
+            Los resultados se cargan únicamente cuando un partido finaliza. Se toma estrictamente el
+            resultado de los <strong>90 minutos reglamentarios</strong> (Football-Data.org · regularTime),
+            ignorando alargue y penales.
+          </p>
+          <Button size="sm" onClick={runFinalizeNow}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Chequear partidos finalizados ahora
+          </Button>
 
           {isLoading ? (
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -748,8 +749,34 @@ function ExportRanking() {
 // MODO PRUEBA: simulador rápido para validar el flujo end-to-end
 // ============================================================
 function TestModeAdmin() {
+  const [seeding, setSeeding] = useState(false);
+  async function seedBots() {
+    setSeeding(true);
+    const { data, error } = await supabase.functions.invoke("seed-test-bots", {
+      body: { match_id: "dae6d78e-7ff7-4281-a307-b8230e486bc4" },
+    });
+    setSeeding(false);
+    if (error) return toast.error(error.message);
+    const created = (data as any)?.created?.length ?? 0;
+    toast.success(`✅ ${created} bots con pronóstico cargado para Bayern vs PSG`);
+  }
   return (
     <div className="space-y-6">
+      <Card className="border-purple-500/40 bg-purple-500/5">
+        <CardHeader><CardTitle className="text-base">🤖 Bots para UCL Bayern vs PSG</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="text-muted-foreground">
+            Crea 10 cuentas bot (<code>bot001..bot010@prode.test</code> · pwd <code>Prode2026!</code>) ya
+            aprobadas, y carga 10 pronósticos distintos para el partido Bayern vs PSG de mañana.
+            El partido tiene multiplicador especial: <strong>Bayern x2</strong> + <strong>partido x1.2</strong>
+            (acertar a favor de Bayern = x2.4, a favor de PSG = x1.2).
+          </p>
+          <Button size="sm" onClick={seedBots} disabled={seeding}>
+            {seeding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FlaskConical className="h-4 w-4 mr-2" />}
+            Generar 10 bots para UCL
+          </Button>
+        </CardContent>
+      </Card>
       <SystemStatusCard />
       <BulkSimulator />
       <SingleMatchSimulator />

@@ -36,6 +36,14 @@ type MatchDetails = {
   venue?: string | null;
 };
 
+type DialogProps = {
+  match: MatchDetails;
+  /** Si true, oculta el resultado real y los puntos (estados ABIERTO/CERRADO/EN JUEGO). */
+  hideRealScore?: boolean;
+  /** Texto del botón disparador. */
+  triggerLabel?: string;
+};
+
 type PredRow = {
   user_id: string;
   pred_a: number;
@@ -44,7 +52,7 @@ type PredRow = {
   display_name: string;
 };
 
-export function MatchDetailsDialog({ match }: { match: MatchDetails }) {
+export function MatchDetailsDialog({ match, hideRealScore = false, triggerLabel = "Ver detalles" }: DialogProps) {
   const { data, isLoading } = useQuery({
     queryKey: ["match-details", match.id],
     queryFn: async () => {
@@ -101,7 +109,7 @@ export function MatchDetailsDialog({ match }: { match: MatchDetails }) {
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" className="w-full">
           <BarChart3 className="h-4 w-4 mr-2" />
-          Ver detalles
+          {triggerLabel}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -121,7 +129,7 @@ export function MatchDetailsDialog({ match }: { match: MatchDetails }) {
                 {flagA && <img src={flagA} alt={match.team_a} className="h-8 w-8 rounded-full object-cover" />}
               </div>
               <div className="text-3xl font-bold tabular-nums">
-                {match.score_a ?? "-"} <span className="text-muted-foreground">:</span> {match.score_b ?? "-"}
+                {hideRealScore ? "-" : (match.score_a ?? "-")} <span className="text-muted-foreground">:</span> {hideRealScore ? "-" : (match.score_b ?? "-")}
               </div>
               <div className="flex items-center gap-2 justify-start min-w-0">
                 {flagB && <img src={flagB} alt={match.team_b} className="h-8 w-8 rounded-full object-cover" />}
@@ -150,21 +158,23 @@ export function MatchDetailsDialog({ match }: { match: MatchDetails }) {
             </div>
           ) : (
             <>
-              {/* Resumen */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-md border p-3 text-center">
-                  <div className="text-2xl font-bold text-success">{hits}</div>
-                  <div className="text-xs text-muted-foreground">Aciertos exactos</div>
+              {/* Resumen (solo si terminó el partido) */}
+              {!hideRealScore && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-md border p-3 text-center">
+                    <div className="text-2xl font-bold text-success">{hits}</div>
+                    <div className="text-xs text-muted-foreground">Aciertos exactos</div>
+                  </div>
+                  <div className="rounded-md border p-3 text-center">
+                    <div className="text-2xl font-bold text-warning">{partial}</div>
+                    <div className="text-xs text-muted-foreground">Resultado correcto</div>
+                  </div>
+                  <div className="rounded-md border p-3 text-center">
+                    <div className="text-2xl font-bold text-muted-foreground">{wrong}</div>
+                    <div className="text-xs text-muted-foreground">Sin puntos</div>
+                  </div>
                 </div>
-                <div className="rounded-md border p-3 text-center">
-                  <div className="text-2xl font-bold text-warning">{partial}</div>
-                  <div className="text-xs text-muted-foreground">Resultado correcto</div>
-                </div>
-                <div className="rounded-md border p-3 text-center">
-                  <div className="text-2xl font-bold text-muted-foreground">{wrong}</div>
-                  <div className="text-xs text-muted-foreground">Sin puntos</div>
-                </div>
-              </div>
+              )}
 
               {/* Distribución */}
               <div>
@@ -187,13 +197,18 @@ export function MatchDetailsDialog({ match }: { match: MatchDetails }) {
               {/* Tabla de pronósticos */}
               <div>
                 <h3 className="text-sm font-semibold mb-2">Pronósticos de los participantes</h3>
+                {hideRealScore && (
+                  <p className="text-xs text-muted-foreground mb-2 italic">
+                    Los puntos se calculan y muestran cuando finalice el partido.
+                  </p>
+                )}
                 <div className="rounded-md border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Usuario</TableHead>
                         <TableHead className="text-center">Pronóstico</TableHead>
-                        <TableHead className="text-right">Puntos</TableHead>
+                        {!hideRealScore && <TableHead className="text-right">Puntos</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -203,26 +218,28 @@ export function MatchDetailsDialog({ match }: { match: MatchDetails }) {
                           <TableCell className="text-center font-mono tabular-nums">
                             {p.pred_a} - {p.pred_b}
                           </TableCell>
-                          <TableCell className="text-right">
-                            {(() => {
-                              const isExact = p.pred_a === match.score_a && p.pred_b === match.score_b;
-                              const hasPts = Number(p.points) > 0;
-                              return (
-                                <Badge
-                                  variant={isExact ? "default" : hasPts ? "secondary" : "outline"}
-                                  className={
-                                    isExact
-                                      ? "bg-success text-success-foreground hover:bg-success"
-                                      : hasPts
-                                      ? "bg-warning text-warning-foreground hover:bg-warning"
-                                      : ""
-                                  }
-                                >
-                                  +{formatPoints(p.points)}
-                                </Badge>
-                              );
-                            })()}
-                          </TableCell>
+                          {!hideRealScore && (
+                            <TableCell className="text-right">
+                              {(() => {
+                                const isExact = p.pred_a === match.score_a && p.pred_b === match.score_b;
+                                const hasPts = Number(p.points) > 0;
+                                return (
+                                  <Badge
+                                    variant={isExact ? "default" : hasPts ? "secondary" : "outline"}
+                                    className={
+                                      isExact
+                                        ? "bg-success text-success-foreground hover:bg-success"
+                                        : hasPts
+                                        ? "bg-warning text-warning-foreground hover:bg-warning"
+                                        : ""
+                                    }
+                                  >
+                                    +{formatPoints(p.points)}
+                                  </Badge>
+                                );
+                              })()}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
