@@ -54,7 +54,6 @@ export default function Admin() {
 
 function MatchesAdmin() {
   const qc = useQueryClient();
-  const [syncing, setSyncing] = useState(false);
   const { data: matches, isLoading } = useQuery({
     queryKey: ["admin-matches"],
     queryFn: async () => {
@@ -64,24 +63,14 @@ function MatchesAdmin() {
     },
   });
 
-  async function syncFromApi() {
-    setSyncing(true);
-    const { data, error } = await supabase.functions.invoke("sync-live-matches");
-    setSyncing(false);
-    if (error) return toast.error(error.message);
-    toast.success(`Sincronizado: ${(data as any)?.updated ?? 0} partidos`);
-    qc.invalidateQueries({ queryKey: ["admin-matches"] });
-    qc.invalidateQueries({ queryKey: ["matches"] });
-    qc.invalidateQueries({ queryKey: ["sync-logs"] });
-  }
-
   return (
     <div className="space-y-4">
+      <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+        <strong>Sincronización automática:</strong> ya no se sincroniza minuto a minuto. Los resultados
+        oficiales (90') se cargan únicamente <strong>cuando el partido ya finalizó</strong>, vía Football-Data.org.
+        Si necesitás algo manual, editá el marcador acá abajo (queda fijo y nunca se sobrescribe).
+      </div>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={syncFromApi} disabled={syncing}>
-          {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-          Sincronizar marcadores en vivo
-        </Button>
         <NewMatchDialog onCreated={() => qc.invalidateQueries({ queryKey: ["admin-matches"] })} />
       </div>
 
