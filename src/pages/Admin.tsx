@@ -415,15 +415,13 @@ function UserRow({ user, onRename, onReject, onUnblock, onDelete }: any) {
           <Button size="sm" variant="outline" onClick={() => onRename(name)}>Guardar</Button>
           {user.is_admin && <Badge>Admin</Badge>}
           {user.status === "rejected" && <Badge variant="destructive">Bloqueado</Badge>}
-          {user.status === "approved" && !user.is_admin && (
+          {user.status === "approved" && (
             <Button size="sm" variant="ghost" onClick={onReject}>Bloquear</Button>
           )}
           {user.status === "rejected" && (
             <Button size="sm" onClick={onUnblock}>Desbloquear</Button>
           )}
-          {!user.is_admin && (
-            <Button size="sm" variant="destructive" onClick={onDelete}>Eliminar</Button>
-          )}
+          <Button size="sm" variant="destructive" onClick={onDelete}>Eliminar</Button>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span>📧 {user.email || "—"}</span>
@@ -516,11 +514,13 @@ function SyncAdmin() {
     },
   });
 
-  async function runSync() {
+  async function runFinalizeNow() {
     const { error } = await supabase.functions.invoke("sync-live-matches");
     if (error) return toast.error(error.message);
-    toast.success("Sync ejecutado");
+    toast.success("Chequeo de partidos finalizados ejecutado");
     qc.invalidateQueries({ queryKey: ["sync-logs"] });
+    qc.invalidateQueries({ queryKey: ["admin-matches"] });
+    qc.invalidateQueries({ queryKey: ["matches"] });
   }
 
   return (
@@ -528,11 +528,19 @@ function SyncAdmin() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <RefreshCw className="h-4 w-4" /> Logs de sincronización
+            <RefreshCw className="h-4 w-4" /> Sincronización (solo al finalizar)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button size="sm" onClick={runSync}><RefreshCw className="h-4 w-4 mr-2" />Forzar sync ahora</Button>
+          <p className="text-xs text-muted-foreground">
+            Los resultados se cargan únicamente cuando un partido finaliza. Se toma estrictamente el
+            resultado de los <strong>90 minutos reglamentarios</strong> (Football-Data.org · regularTime),
+            ignorando alargue y penales.
+          </p>
+          <Button size="sm" onClick={runFinalizeNow}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Chequear partidos finalizados ahora
+          </Button>
 
           {isLoading ? (
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
