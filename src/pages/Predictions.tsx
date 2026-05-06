@@ -69,7 +69,7 @@ export default function Predictions() {
         .select("*")
         .order("kickoff_at", { ascending: true });
       if (error) throw error;
-      return data as Match[];
+      return (data ?? []) as unknown as Match[];
     },
   });
 
