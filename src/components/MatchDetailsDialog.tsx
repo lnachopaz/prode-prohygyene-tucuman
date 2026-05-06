@@ -109,7 +109,7 @@ export function MatchDetailsDialog({ match, hideRealScore = false, triggerLabel 
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" className="w-full">
           <BarChart3 className="h-4 w-4 mr-2" />
-          Ver detalles
+          {triggerLabel}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -129,7 +129,7 @@ export function MatchDetailsDialog({ match, hideRealScore = false, triggerLabel 
                 {flagA && <img src={flagA} alt={match.team_a} className="h-8 w-8 rounded-full object-cover" />}
               </div>
               <div className="text-3xl font-bold tabular-nums">
-                {match.score_a ?? "-"} <span className="text-muted-foreground">:</span> {match.score_b ?? "-"}
+                {hideRealScore ? "-" : (match.score_a ?? "-")} <span className="text-muted-foreground">:</span> {hideRealScore ? "-" : (match.score_b ?? "-")}
               </div>
               <div className="flex items-center gap-2 justify-start min-w-0">
                 {flagB && <img src={flagB} alt={match.team_b} className="h-8 w-8 rounded-full object-cover" />}
