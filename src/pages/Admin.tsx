@@ -343,8 +343,12 @@ function UsersAdmin() {
     qc.invalidateQueries({ queryKey: ["admin-pending-detailed"] });
   }
 
-  async function deleteUser(userId: string, displayName: string) {
-    if (!confirm(`¿Eliminar definitivamente a "${displayName}"? Se borrarán todos sus datos (pronósticos, perfil y cuenta). El email quedará libre para registrarse de nuevo.`)) return;
+  async function deleteUser(userId: string, displayName: string, isAdmin: boolean) {
+    const warn = isAdmin
+      ? `⚠️ "${displayName}" es ADMIN. ¿Eliminar definitivamente su cuenta y todos sus datos?\n\nEsta acción no se puede deshacer.`
+      : `¿Eliminar definitivamente a "${displayName}"? Se borrarán todos sus datos (pronósticos, perfil y cuenta). El email quedará libre para registrarse de nuevo.`;
+    if (!confirm(warn)) return;
+    if (isAdmin && !confirm(`Confirmá una vez más: eliminar al admin "${displayName}".`)) return;
     const { error } = await supabase.rpc("delete_user_completely", { _user_id: userId });
     if (error) return toast.error(error.message);
     toast.success("Usuario eliminado");
