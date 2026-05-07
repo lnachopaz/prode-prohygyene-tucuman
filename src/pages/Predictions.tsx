@@ -569,7 +569,7 @@ function ScoreInput({
         type="number"
         min={0}
         inputMode="numeric"
-        className="w-12 sm:w-14 text-center text-xl font-bold h-10 px-1"
+        className="w-12 sm:w-14 text-center text-xl font-bold h-10 px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
