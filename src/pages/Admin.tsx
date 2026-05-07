@@ -496,30 +496,35 @@ function CodesAdmin() {
   }
 
   return (
-    <div className="space-y-4 max-w-xl">
-      <Card>
-        <CardHeader><CardTitle className="text-base">Nuevo código</CardTitle></CardHeader>
-        <CardContent className="flex gap-2">
-          <Input value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="ej: PH-ADMIN-2026" />
-          <Button onClick={add}><Plus className="h-4 w-4 mr-2" />Crear</Button>
-        </CardContent>
-      </Card>
-      <div className="space-y-2">
-        {codes?.map((c) => (
-          <Card key={c.id}>
-            <CardContent className="p-3 flex items-center gap-2">
-              <code className="flex-1 font-mono">{c.code}</code>
-              {c.active ? <Badge className="bg-success text-success-foreground">Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>}
-              <Button size="sm" variant="outline" onClick={() => toggle(c.id, c.active)}>
-                {c.active ? "Desactivar" : "Activar"}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => remove(c.id)}>
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+    <div className="space-y-6 max-w-3xl">
+      <div className="space-y-4 max-w-xl">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Nuevo código</CardTitle></CardHeader>
+          <CardContent className="flex gap-2">
+            <Input value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="ej: PH-ADMIN-2026" />
+            <Button onClick={add}><Plus className="h-4 w-4 mr-2" />Crear</Button>
+          </CardContent>
+        </Card>
+        <div className="space-y-2">
+          {codes?.map((c) => (
+            <Card key={c.id}>
+              <CardContent className="p-3 flex items-center gap-2">
+                <code className="flex-1 font-mono">{c.code}</code>
+                {c.active ? <Badge className="bg-success text-success-foreground">Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>}
+                <Button size="sm" variant="outline" onClick={() => toggle(c.id, c.active)}>
+                  {c.active ? "Desactivar" : "Activar"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => remove(c.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
+
+      <ExportRanking />
+      <BackupAllPredictions />
     </div>
   );
 }
