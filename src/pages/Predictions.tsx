@@ -257,7 +257,8 @@ export default function Predictions() {
       ) : (
         grouped.map(([date, dayMatches]) => (
           <section key={date} className="space-y-3">
-            <h2 className="text-lg font-semibold capitalize text-muted-foreground">
+            <h2 className="text-lg font-semibold capitalize text-muted-foreground flex items-center gap-2">
+              <Calendar className="h-4 w-4 shrink-0" />
               {(() => {
                 const [y, mo, d] = date.split("-").map(Number);
                 return format(new Date(y, mo - 1, d, 12), "EEEE d 'de' MMMM yyyy", { locale: es });
