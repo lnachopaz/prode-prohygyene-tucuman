@@ -1041,7 +1041,23 @@ function EditablePredRow({
   const [b, setB] = useState(String(row.pred_b));
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
+  async function doDelete() {
+    setDeleting(true);
+    const { error } = await supabase.rpc("admin_delete_prediction", { _prediction_id: row.id });
+    setDeleting(false);
+    setDeleteOpen(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Pronóstico eliminado");
+      qc.invalidateQueries({ queryKey: ["pred-admin-rows", userId] });
+      qc.invalidateQueries({ queryKey: ["ranking-leaderboard"] });
+      qc.invalidateQueries({ queryKey: ["ranking-preds-all"] });
+    }
+  }
   function openEdit() {
     setA(String(row.pred_a));
     setB(String(row.pred_b));
