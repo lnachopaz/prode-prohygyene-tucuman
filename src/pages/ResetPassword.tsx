@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Eye, EyeOff, Check, X, KeyRound } from "lucide-react";
+import { Loader2, Eye, EyeOff, Check, X, KeyRound, AlertTriangle } from "lucide-react";
 import logo from "@/assets/prohygiene-logo.png";
 import { passwordRules, isPasswordValid } from "@/lib/passwordRules";
 
@@ -14,22 +14,39 @@ export default function ResetPassword() {
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
   const [hasRecoverySession, setHasRecoverySession] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // Reenviar email
+  const [resendEmail, setResendEmail] = useState("");
+  const [resending, setResending] = useState(false);
+
   useEffect(() => {
-    // Supabase pone el token en el hash al hacer click en el link de recovery.
-    // El SDK lo procesa automáticamente y dispara onAuthStateChange con event=PASSWORD_RECOVERY.
+    // Si Supabase devolvió un error en el hash (link expirado o ya usado), capturarlo.
+    const hash = window.location.hash || "";
+    const params = new URLSearchParams(hash.replace(/^#/, ""));
+    const errCode = params.get("error_code") || params.get("error");
+    const errDesc = params.get("error_description");
+    if (errCode) {
+      const friendly =
+        errCode === "otp_expired"
+          ? "Este enlace expiró o ya fue usado. Pedí uno nuevo."
+          : (errDesc ? decodeURIComponent(errDesc.replace(/\+/g, " ")) : "El enlace no es válido.");
+      setLinkError(friendly);
+      setReady(true);
+      return;
+    }
+
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY" || (session && window.location.hash.includes("type=recovery"))) {
         setHasRecoverySession(true);
       }
     });
 
-    // También chequeamos sesión actual (por si el evento ya pasó).
     supabase.auth.getSession().then(({ data }) => {
       const hashOk = window.location.hash.includes("type=recovery") || window.location.hash.includes("access_token");
       if (data.session && hashOk) setHasRecoverySession(true);
@@ -58,6 +75,19 @@ export default function ResetPassword() {
     navigate("/auth", { replace: true });
   }
 
+  async function handleResend(e: React.FormEvent) {
+    e.preventDefault();
+    const email = resendEmail.trim();
+    if (!email) return toast.error("Ingresá tu email");
+    setResending(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResending(false);
+    if (error) return toast.error(error.message);
+    toast.success("Te enviamos un email nuevo. Abrilo desde el mismo dispositivo y navegador.");
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
       <div className="w-full max-w-md">
@@ -77,12 +107,35 @@ export default function ResetPassword() {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
-            ) : !hasRecoverySession ? (
-              <div className="space-y-4 text-sm">
-                <p className="text-muted-foreground">
-                  Este enlace no es válido o ya expiró. Volvé a pedir un email de recuperación desde el inicio de sesión.
-                </p>
-                <Button className="w-full" onClick={() => navigate("/auth", { replace: true })}>
+            ) : linkError || !hasRecoverySession ? (
+              <div className="space-y-4">
+                <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                  <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                  <div className="space-y-1">
+                    <p className="font-medium">{linkError ?? "El enlace no es válido o ya expiró."}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Tip: abrí el último mail recibido y hacelo desde el mismo navegador donde lo pediste. Algunos clientes de email (Gmail/Outlook) escanean el link y lo consumen antes que vos.
+                    </p>
+                  </div>
+                </div>
+                <form onSubmit={handleResend} className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="resendEmail">Reenviar email de recuperación</Label>
+                    <Input
+                      id="resendEmail"
+                      type="email"
+                      required
+                      placeholder="tu@email.com"
+                      value={resendEmail}
+                      onChange={(e) => setResendEmail(e.target.value)}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={resending}>
+                    {resending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Enviar nuevo enlace
+                  </Button>
+                </form>
+                <Button variant="outline" className="w-full" onClick={() => navigate("/auth", { replace: true })}>
                   Volver al inicio
                 </Button>
               </div>
