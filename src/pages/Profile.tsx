@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, FileDown, FileText } from "lucide-react";
+import { Loader2, FileDown, FileText, KeyRound, Eye, EyeOff, Check, X } from "lucide-react";
 import {
   fetchUserPredictions,
   exportUserPredictionsCSV,
@@ -15,12 +15,35 @@ import {
 } from "@/lib/predictionsExport";
 import { TournamentRules } from "@/components/TournamentRules";
 import { formatPoints } from "@/lib/formatPoints";
+import { passwordRules, isPasswordValid } from "@/lib/passwordRules";
 
 export default function Profile() {
   const { user, isAdmin } = useAuth();
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+
+  // change password
+  const [newPwd, setNewPwd] = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+  const [changingPwd, setChangingPwd] = useState(false);
+  const newPwdValid = isPasswordValid(newPwd);
+  const newPwdMatches = newPwd.length > 0 && newPwd === confirmPwd;
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newPwdValid) return toast.error("La contraseña no cumple los requisitos");
+    if (!newPwdMatches) return toast.error("Las contraseñas no coinciden");
+    setChangingPwd(true);
+    const { error } = await supabase.auth.updateUser({ password: newPwd });
+    setChangingPwd(false);
+    if (error) return toast.error(error.message);
+    toast.success("Contraseña actualizada");
+    setNewPwd("");
+    setConfirmPwd("");
+  }
 
   async function handleExport(kind: "csv" | "pdf") {
     if (!user) return;
@@ -146,6 +169,83 @@ export default function Profile() {
               Descargar PDF
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="h-5 w-5" /> Cambiar contraseña
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPwd">Contraseña nueva</Label>
+              <div className="relative">
+                <Input
+                  id="newPwd"
+                  type={showNewPwd ? "text" : "password"}
+                  required
+                  value={newPwd}
+                  onChange={(e) => setNewPwd(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPwd((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                  aria-label={showNewPwd ? "Ocultar" : "Mostrar"}
+                >
+                  {showNewPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <ul className="space-y-1 rounded-md border bg-muted/30 p-2 text-xs">
+                {passwordRules.map((rule) => {
+                  const ok = rule.test(newPwd);
+                  return (
+                    <li key={rule.label} className={`flex items-center gap-2 ${ok ? "text-success" : "text-muted-foreground"}`}>
+                      {ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                      <span>{rule.label}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPwd">Repetir contraseña</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPwd"
+                  type={showConfirmPwd ? "text" : "password"}
+                  required
+                  value={confirmPwd}
+                  onChange={(e) => setConfirmPwd(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPwd((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                  aria-label={showConfirmPwd ? "Ocultar" : "Mostrar"}
+                >
+                  {showConfirmPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {confirmPwd.length > 0 && (
+                <p className={`flex items-center gap-2 text-xs ${newPwdMatches ? "text-success" : "text-destructive"}`}>
+                  {newPwdMatches ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                  {newPwdMatches ? "Las contraseñas coinciden" : "Las contraseñas no coinciden"}
+                </p>
+              )}
+            </div>
+            <Button type="submit" disabled={changingPwd}>
+              {changingPwd && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Actualizar contraseña
+            </Button>
+          </form>
         </CardContent>
       </Card>
 
