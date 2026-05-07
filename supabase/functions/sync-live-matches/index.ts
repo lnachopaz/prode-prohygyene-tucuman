@@ -88,6 +88,7 @@ Deno.serve(async (req) => {
       );
 
     const matches = candidates ?? [];
+    console.log(`[sync] now=${now.toISOString()} candidates=${matches.length}`, matches.map((m: any) => `${m.team_a} vs ${m.team_b} (${m.status}) ko=${m.kickoff_at}`));
 
     if (matches.length === 0) {
       await finishLog({
