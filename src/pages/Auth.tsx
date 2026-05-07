@@ -18,10 +18,16 @@ export default function Auth() {
   const [busy, setBusy] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
 
-  // forgot password
+  // forgot password (OTP flow)
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [sendingReset, setSendingReset] = useState(false);
+  const [forgotStep, setForgotStep] = useState<"email" | "code">("email");
+  const [otpCode, setOtpCode] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [newPwdConfirm, setNewPwdConfirm] = useState("");
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   // login state
   const [loginEmail, setLoginEmail] = useState("");
