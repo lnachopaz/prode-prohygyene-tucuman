@@ -1,4 +1,4 @@
-// Sync con Football-Data: marca live + finalize en momentos clave.
+// Sync con Football-Data: marca live + finalize en momentos clave. (v2 — live + finalize)
 //
 // Ventanas de chequeo por partido (relativo al kickoff):
 //   -5, 0, +5 min  → para detectar arranque (status='live')

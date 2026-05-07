@@ -1,121 +1,93 @@
-## Resumen
+## Objetivo
 
-Cuatro cambios coordinados: (1) sincronización proactiva con Football-Data en momentos clave para marcar EN JUEGO y FINALIZADO, (2) marco rojo correcto cuando arranca el partido, (3) sacar el aviso global de "90 min" de la pestaña Pronósticos (solo queda en el Reglamento), y (4) mostrar el botón "Ver pronósticos de los demás" únicamente para partidos que ya empezaron o terminaron — nunca durante la hora previa al kickoff.
-
----
-
-## 1) Sync con Football-Data: live + finalize en momentos clave
-
-Hoy `sync-live-matches` solo finaliza partidos y nunca marca `live`, por eso la tarjeta nunca se pone roja. Cambios:
-
-### a) Reescritura de `supabase/functions/sync-live-matches/index.ts`
-
-El edge function hace **un solo trabajo**: para cada partido `test_mode=false` con `external_id` cuyo `kickoff_at` esté dentro de **alguna ventana de chequeo**, consulta el upstream y aplica:
-
-- Si upstream `IN_PLAY` o `PAUSED` (medio tiempo) → `status='live'` (si todavía no lo está). Sin tocar `score_a/score_b` (la UI los oculta igual).
-- Si upstream `FINISHED` o `AWARDED` → extrae `score.regularTime` (mismo criterio actual) y marca `status='finished'`.
-- Si upstream `SCHEDULED/TIMED` y ya pasó el kickoff hace ≥ 5 min → no hace nada (esperamos al próximo tick).
-
-Ventanas de chequeo por partido (en minutos relativos al kickoff):
-```
--5, 0, +5    → para detectar arranque (live)
-+115, +120, +125 → para detectar final
-```
-Cada tick acepta ±2 min de tolerancia (porque el cron corre cada 1 min, no en el minuto exacto).
-
-Selección SQL en cada corrida:
-```sql
-select id, external_id, team_a, team_b, status, kickoff_at
-from matches
-where test_mode = false
-  and external_id is not null
-  and status <> 'finished'
-  and (
-        kickoff_at between now() - interval '7 min'  and now() + interval '7 min'   -- ventanas -5, 0, +5
-     or kickoff_at between now() - interval '127 min' and now() - interval '113 min' -- ventanas +115, +120, +125
-  )
-```
-
-Mantiene rate limiting (espera 6.5s entre llamadas), doble pase para finalize, y registra todo en `sync_logs`.
-
-### b) Cron pg_cron cada 1 minuto
-
-Insertar (no migración, porque incluye `apikey`) un cron que llama al edge cada minuto. La función se autoprotege con la query del punto anterior: la mayoría de las veces no hay candidatos y retorna en < 100ms sin gastar cuota de la API.
-
-```sql
-select cron.schedule(
-  'sync-matches-live-finalize',
-  '* * * * *',
-  $$ select net.http_post(
-       url := 'https://bmbxkuiqyqbaviqeauzc.supabase.co/functions/v1/sync-live-matches',
-       headers := '{"Content-Type":"application/json","apikey":"<ANON>"}'::jsonb
-     ); $$
-);
-```
-
-(Si ya existe un cron viejo apuntando al mismo endpoint, se hace `cron.unschedule` antes.)
-
-### c) Frontend `useLiveMatches`
-
-Para que el marco rojo aparezca rápido cuando el cron marca `live`, bajar el refetch de **5 min → 60 s** durante la ventana de partidos en curso. Implementación simple: dejar `refetchInterval: 60_000` siempre (la query es liviana y trae todos los partidos en una sola llamada, ya cacheada por React Query).
-
-### d) Botón manual queda como fallback
-
-En Admin > Sync, dejamos un botón "Sincronizar ahora" que invoca el mismo edge function por si el cron falla.
+Garantizar que cuando un partido arranca pase a **EN JUEGO** (recuadro rojo) y que al terminar se cargue automáticamente el marcador de los 90′. Hoy esto no funciona porque el edge function deployado quedó desactualizado.
 
 ---
 
-## 2) Marco rojo cuando el partido inicia
+## Diagnóstico
 
-No hay cambio de código en `Predictions.tsx` (la lógica `derivedState === "EN_JUEGO"` ya pinta el marco rojo). El bug actual es que **nunca se setea `status='live'`** porque el sync solo finaliza. Con el cambio del punto 1, las tarjetas se ponen rojas automáticamente entre los minutos −5 y +5 del kickoff.
-
----
-
-## 3) Quitar el aviso de "90 min" de Pronósticos
-
-Eliminar el bloque `<div class="rounded-lg border border-primary/30 bg-primary/5 ...">` (líneas 206-212 de `src/pages/Predictions.tsx`) que dice *"Los resultados oficiales (90 min) y el cálculo de puntos se cargarán y mostrarán únicamente al finalizar cada partido"*.
-
-Verificar que el Reglamento (`src/components/TournamentRules.tsx`) ya menciona la regla de los 90' (sí, en la sección "Eliminación directa": *"Se toma el resultado de los 90 minutos reglamentarios"*). Reforzar ese párrafo agregando explícitamente que **los puntos y el resultado oficial se publican únicamente cuando el partido termina**.
+1. El cron `sync-matches-live-finalize` corre cada 1 min ✅
+2. El archivo `supabase/functions/sync-live-matches/index.ts` ya tiene la lógica nueva (ventanas −7/+7 min para live y −127/−113 min para finalize) ✅
+3. **Pero el deploy quedó en el código viejo**: la última respuesta es *"No hay partidos pendientes de finalizar"* y los logs muestran *"no matches in finalize window"* — frases que ya no existen en el código actual. Esto explica por qué nunca se marca `status='live'` y el recuadro rojo nunca aparece.
+4. El único partido real próximo es **Levante vs Osasuna** mañana viernes 16:00 hs ARG (~29 h). No alcanza con esperar: hay que validar la mecánica antes.
 
 ---
 
-## 4) Ocultar "Ver pronósticos de los demás" antes del kickoff
+## Plan
 
-Hoy la tarjeta muestra el botón en cualquier estado distinto de ABIERTO, lo que incluye CERRADO durante la hora previa al partido. Cambio en `src/pages/Predictions.tsx`:
+### 1) Forzar redeploy del edge function
 
-```tsx
-// Antes:
-{derivedState !== "ABIERTO" && (<MatchDetailsDialog ... />)}
+Tocar `supabase/functions/sync-live-matches/index.ts` (agregar versión en un comentario, sin cambiar la lógica) para que el sistema lo redeploye. Verificar con un POST manual que la respuesta nueva sea `{"updated":0, "message":"Sin partidos en ventana."}` (texto del código nuevo).
 
-// Después: solo cuando ya empezó o terminó
-{(derivedState === "EN_JUEGO" || derivedState === "FINALIZADO") && (
-  <MatchDetailsDialog ... />
-)}
-```
+### 2) Verificar live-detection con Levante (sin tocar la base de datos del usuario)
 
-Los partidos en CERRADO (1 h antes del kickoff y antes de que el sync los marque `live`) no muestran el botón. El usuario ve solamente su propio pronóstico bloqueado, y el botón aparece automáticamente cuando el partido pasa a EN_JUEGO o FINALIZADO.
-
----
-
-## Detalle técnico (resumen)
+Test temporal y reversible:
 
 ```text
-Archivos a modificar:
-  supabase/functions/sync-live-matches/index.ts   (live + finalize, ventanas -5/0/+5 y +115/+120/+125)
-  src/pages/Predictions.tsx                        (quitar banner 90', cambiar condición del botón "Ver pronósticos")
-  src/components/TournamentRules.tsx               (reforzar nota sobre publicación de resultado/puntos)
-  src/hooks/useLiveMatches.ts                      (refetch 60s en lugar de 5min)
-
-SQL (vía supabase--insert, NO migración, porque incluye apikey):
-  - cron.unschedule de cualquier job previo apuntando al endpoint.
-  - cron.schedule 'sync-matches-live-finalize' cada 1 minuto.
-
-Sin cambios:
-  - Esquema de tablas.
-  - Funciones de scoring.
-  - Política RLS.
+a. Anotar kickoff_at original de Levante vs Osasuna  → 2026-05-08T19:00:00Z
+b. UPDATE matches SET kickoff_at = now() - interval '1 minute'
+   WHERE external_id = 'fd-544554'
+c. Esperar al próximo tick del cron (≤60 s) o disparar el botón
+   "Sync partidos" en Admin.
+d. Verificar:
+     - status = 'live' en la tabla matches
+     - en /predictions, la tarjeta tiene marco rojo + badge "EN JUEGO"
+     - sync_logs muestra action='marked-live'
+e. Si Football-Data devuelve SCHEDULED (porque en la realidad el partido
+   todavía no empezó), nuestro código no lo marca live. En ese caso usar
+   la opción B (más abajo).
+f. Restaurar: UPDATE matches SET kickoff_at = '2026-05-08T19:00:00Z',
+   status = 'scheduled' WHERE external_id = 'fd-544554'.
 ```
 
-## Cuota API estimada
+**Opción B (si el upstream no coopera con la simulación)**: marcar manualmente `status='live'` desde el botón Admin existente y validar visualmente que el frontend muestra el recuadro rojo, badge "EN JUEGO" y oculta el marcador real (verifica solo la UI, no la sincronización).
 
-Plan free Football-Data = 10 req/min, 100 req/día. Con esta política, por **cada** partido se gastan máximo 6 requests (3 para detectar live + 3 para finalize). En un día con 4 partidos UCL = 24 requests. Holgado.
+### 3) Verificar finalize-detection con Levante
+
+```text
+a. UPDATE matches SET kickoff_at = now() - interval '120 minutes',
+   status = 'live' WHERE external_id = 'fd-544554'
+b. Disparar "Sync partidos".
+c. Si Football-Data devuelve FINISHED para ese partido, nuestro código
+   debería:
+     - extraer score.regularTime
+     - actualizar matches: status='finished', score_a, score_b
+     - el trigger recalc_predictions_for_match recalcula puntos
+d. Si el upstream sigue SCHEDULED (porque en la vida real no se jugó),
+   no podemos validar la finalización contra la API real con este
+   partido. En ese caso ver Opción C.
+e. Restaurar el kickoff y status originales.
+```
+
+**Opción C (validar finalize sin depender del upstream)**: agregar un test temporal con un partido ya jugado de fecha pasada (ej. una jornada de La Liga ya terminada) creado en modo `test_mode=false` y con `external_id` real. Simular ventana finalize moviendo `kickoff_at` a `now() − 120 min` y comprobar que el sync trae el score real. Borrarlo al terminar el test.
+
+### 4) Quick win adicional: log más explícito
+
+Mientras tocamos el edge function para redeploy, agregar un `console.log` con cantidad de candidatos y acción tomada por cada uno, para que la próxima vez el debug sea instantáneo desde edge-function-logs (hoy solo se ve "booted/shutdown").
+
+---
+
+## Detalle técnico
+
+```text
+Archivos a tocar:
+  supabase/functions/sync-live-matches/index.ts
+    - bump de versión en comentario header (forza redeploy)
+    - logs adicionales (console.log con candidatos y resultados)
+
+SQL temporal (vía supabase--insert, no migración):
+  - UPDATE de kickoff_at en Levante para simular ventanas live y finalize.
+  - Restauración al kickoff original.
+
+Sin cambios en:
+  - Esquema de la base de datos.
+  - Lógica de scoring.
+  - Componentes de UI (la lógica del recuadro rojo y la badge "EN JUEGO"
+    ya están bien — el bug es 100% del backend / deploy).
+```
+
+## Criterio de éxito
+
+- POST a `/sync-live-matches` responde con el mensaje del código nuevo.
+- Al simular kickoff hace 1 min, el partido pasa a `status='live'` en ≤60 s y la tarjeta de pronósticos muestra recuadro rojo + badge "EN JUEGO" + esconde el marcador real.
+- Al simular kickoff hace 120 min, el partido pasa a `status='finished'` con `score_a` y `score_b` extraídos de `score.regularTime`, y los puntos se recalculan automáticamente.
