@@ -194,6 +194,48 @@ export default function Auth() {
                       </button>
                     </div>
                   </div>
+                  <div className="flex justify-end -mt-2">
+                    <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+                      <DialogTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => setForgotEmail(loginEmail)}
+                        >
+                          ¿Olvidaste tu contraseña?
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <KeyRound className="h-5 w-5 text-primary" />
+                            Recuperar contraseña
+                          </DialogTitle>
+                          <DialogDescription>
+                            Ingresá tu email y te enviaremos un enlace para crear una nueva contraseña.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleSendReset} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="forgotEmail">Email</Label>
+                            <Input
+                              id="forgotEmail"
+                              type="email"
+                              required
+                              value={forgotEmail}
+                              onChange={(e) => setForgotEmail(e.target.value)}
+                            />
+                          </div>
+                          <DialogFooter>
+                            <Button type="submit" disabled={sendingReset} className="w-full sm:w-auto">
+                              {sendingReset && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                              Enviar enlace
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                   <Button type="submit" className="w-full" disabled={busy}>
                     {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Entrar
