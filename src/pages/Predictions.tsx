@@ -527,8 +527,8 @@ function MatchCard({
           </Button>
         )}
 
-        {/* Ver pronósticos de los demás (CERRADO / EN JUEGO / FINALIZADO) */}
-        {derivedState !== "ABIERTO" && (
+        {/* Ver pronósticos de los demás (solo desde EN_JUEGO o FINALIZADO) */}
+        {(derivedState === "EN_JUEGO" || derivedState === "FINALIZADO") && (
           <MatchDetailsDialog
             match={match}
             hideRealScore={derivedState !== "FINALIZADO"}
