@@ -1,4 +1,4 @@
-// Sync con Football-Data: marca live + finalize en momentos clave.
+// Sync con Football-Data: marca live + finalize en momentos clave. (v2 — live + finalize)
 //
 // Ventanas de chequeo por partido (relativo al kickoff):
 //   -5, 0, +5 min  → para detectar arranque (status='live')
@@ -88,6 +88,7 @@ Deno.serve(async (req) => {
       );
 
     const matches = candidates ?? [];
+    console.log(`[sync] now=${now.toISOString()} candidates=${matches.length}`, matches.map((m: any) => `${m.team_a} vs ${m.team_b} (${m.status}) ko=${m.kickoff_at}`));
 
     if (matches.length === 0) {
       await finishLog({
