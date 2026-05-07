@@ -250,7 +250,7 @@ export default function Auth() {
                     </div>
                   </div>
                   <div className="flex justify-end -mt-2">
-                    <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+                    <Dialog open={forgotOpen} onOpenChange={resetForgotDialog}>
                       <DialogTrigger asChild>
                         <button
                           type="button"
@@ -267,27 +267,108 @@ export default function Auth() {
                             Recuperar contraseña
                           </DialogTitle>
                           <DialogDescription>
-                            Ingresá tu email y te enviaremos un enlace para crear una nueva contraseña.
+                            {forgotStep === "email"
+                              ? "Ingresá tu email y te enviaremos un código de 6 dígitos."
+                              : `Ingresá el código que enviamos a ${forgotEmail} y elegí una nueva contraseña.`}
                           </DialogDescription>
                         </DialogHeader>
-                        <form onSubmit={handleSendReset} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="forgotEmail">Email</Label>
-                            <Input
-                              id="forgotEmail"
-                              type="email"
-                              required
-                              value={forgotEmail}
-                              onChange={(e) => setForgotEmail(e.target.value)}
-                            />
-                          </div>
-                          <DialogFooter>
-                            <Button type="submit" disabled={sendingReset} className="w-full sm:w-auto">
-                              {sendingReset && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                              Enviar enlace
-                            </Button>
-                          </DialogFooter>
-                        </form>
+                        {forgotStep === "email" ? (
+                          <form onSubmit={handleSendReset} className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="forgotEmail">Email</Label>
+                              <Input
+                                id="forgotEmail"
+                                type="email"
+                                required
+                                value={forgotEmail}
+                                onChange={(e) => setForgotEmail(e.target.value)}
+                              />
+                            </div>
+                            <DialogFooter>
+                              <Button type="submit" disabled={sendingReset} className="w-full sm:w-auto">
+                                {sendingReset && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                Enviar código
+                              </Button>
+                            </DialogFooter>
+                          </form>
+                        ) : (
+                          <form onSubmit={handleVerifyOtpAndReset} className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="otpCode">Código de 6 dígitos</Label>
+                              <Input
+                                id="otpCode"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={6}
+                                required
+                                value={otpCode}
+                                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                                placeholder="123456"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="newPwd">Nueva contraseña</Label>
+                              <div className="relative">
+                                <Input
+                                  id="newPwd"
+                                  type={showNewPwd ? "text" : "password"}
+                                  required
+                                  value={newPwd}
+                                  onChange={(e) => setNewPwd(e.target.value)}
+                                  className="pr-10"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowNewPwd((v) => !v)}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                  tabIndex={-1}
+                                  aria-label={showNewPwd ? "Ocultar" : "Mostrar"}
+                                >
+                                  {showNewPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                              </div>
+                              <ul className="space-y-1 rounded-md border bg-muted/30 p-2 text-xs">
+                                {newPwdRules.map((rule) => {
+                                  const ok = rule.test(newPwd);
+                                  return (
+                                    <li
+                                      key={rule.label}
+                                      className={`flex items-center gap-2 ${ok ? "text-success" : "text-muted-foreground"}`}
+                                    >
+                                      {ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                                      <span>{rule.label}</span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="newPwdConfirm">Repetir contraseña</Label>
+                              <Input
+                                id="newPwdConfirm"
+                                type={showNewPwd ? "text" : "password"}
+                                required
+                                value={newPwdConfirm}
+                                onChange={(e) => setNewPwdConfirm(e.target.value)}
+                              />
+                              {newPwdConfirm.length > 0 && (
+                                <p className={`flex items-center gap-2 text-xs ${newPwdMatches ? "text-success" : "text-destructive"}`}>
+                                  {newPwdMatches ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                                  {newPwdMatches ? "Las contraseñas coinciden" : "Las contraseñas no coinciden"}
+                                </p>
+                              )}
+                            </div>
+                            <DialogFooter className="gap-2 sm:gap-0">
+                              <Button type="button" variant="outline" onClick={() => setForgotStep("email")}>
+                                Reenviar código
+                              </Button>
+                              <Button type="submit" disabled={verifyingOtp}>
+                                {verifyingOtp && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                Cambiar contraseña
+                              </Button>
+                            </DialogFooter>
+                          </form>
+                        )}
                       </DialogContent>
                     </Dialog>
                   </div>
