@@ -97,6 +97,25 @@ function MatchesAdmin() {
   );
 }
 
+function SyncMatchesButton({ onDone }: { onDone: () => void }) {
+  const [loading, setLoading] = useState(false);
+  async function run() {
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke("sync-live-matches");
+    setLoading(false);
+    if (error) return toast.error(error.message);
+    const updated = (data as any)?.updated ?? 0;
+    toast.success(updated > 0 ? `Sync OK · ${updated} actualizado(s)` : "Sync OK · sin cambios");
+    onDone();
+  }
+  return (
+    <Button variant="outline" onClick={run} disabled={loading}>
+      {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+      Sync partidos
+    </Button>
+  );
+}
+
 function MatchAdminRow({ match, onChange }: { match: any; onChange: () => void }) {
   const [sa, setSa] = useState<string>(match.score_a?.toString() ?? "");
   const [sb, setSb] = useState<string>(match.score_b?.toString() ?? "");
