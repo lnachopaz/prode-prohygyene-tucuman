@@ -1,93 +1,121 @@
 ## Resumen
 
-Refactor profundo en 5 ejes: estados de partido + UI, sincronización solo al finalizar, multiplicadores combinados (equipo + partido) para el test de UCL, bots de prueba, y permisos absolutos de admin.
+Cuatro cambios coordinados: (1) sincronización proactiva con Football-Data en momentos clave para marcar EN JUEGO y FINALIZADO, (2) marco rojo correcto cuando arranca el partido, (3) sacar el aviso global de "90 min" de la pestaña Pronósticos (solo queda en el Reglamento), y (4) mostrar el botón "Ver pronósticos de los demás" únicamente para partidos que ya empezaron o terminaron — nunca durante la hora previa al kickoff.
 
 ---
 
-## 1) Estados del partido y UI (`src/pages/Predictions.tsx` + `MatchDetailsDialog.tsx`)
+## 1) Sync con Football-Data: live + finalize en momentos clave
 
-Se define un único `derivedState` por partido con cuatro valores:
+Hoy `sync-live-matches` solo finaliza partidos y nunca marca `live`, por eso la tarjeta nunca se pone roja. Cambios:
 
-- **ABIERTO**: `status='scheduled'` y aún no se llegó al `lockAt` (1h antes del kickoff o ventana).
-- **CERRADO**: `status='scheduled'` pero ya se pasó el `lockAt` (o `force_closed`, o ventana cerrada). Inputs bloqueados, botón "Ver pronósticos de los demás".
-- **EN JUEGO**: `status='live'`. Marco rojo (`border-2 border-destructive`), badge animado "EN JUEGO", inputs bloqueados, **el resultado real NO se muestra** (se oculta `score_a/score_b` aunque exista). Sí se muestra "Ver pronósticos de los demás".
-- **FINALIZADO**: `status='finished'`. Se muestra resultado oficial (90'), puntos del usuario y `MatchDetailsDialog` con la tabla completa.
+### a) Reescritura de `supabase/functions/sync-live-matches/index.ts`
 
-Cambios concretos:
-- Quitar el bloque "Marcador en vivo" (líneas 480-488 de `Predictions.tsx`) — en EN JUEGO no se muestra score.
-- En estado CERRADO, mostrar el componente `MatchDetailsDialog` (que ya lista pronósticos de todos) con un botón "Ver qué pronosticaron los demás". Adaptar `MatchDetailsDialog` para aceptar `hideRealScore` y ocultar columnas/sección de "Resultado real" / "Aciertos" cuando el partido aún no terminó.
-- Banner global arriba de la página: *"Los resultados oficiales (90 min) y el cálculo de puntos se cargarán y mostrarán únicamente al finalizar cada partido."*
+El edge function hace **un solo trabajo**: para cada partido `test_mode=false` con `external_id` cuyo `kickoff_at` esté dentro de **alguna ventana de chequeo**, consulta el upstream y aplica:
 
-## 2) Sincronización: solo al finalizar (`supabase/functions/sync-live-matches/index.ts` + Admin.tsx)
+- Si upstream `IN_PLAY` o `PAUSED` (medio tiempo) → `status='live'` (si todavía no lo está). Sin tocar `score_a/score_b` (la UI los oculta igual).
+- Si upstream `FINISHED` o `AWARDED` → extrae `score.regularTime` (mismo criterio actual) y marca `status='finished'`.
+- Si upstream `SCHEDULED/TIMED` y ya pasó el kickoff hace ≥ 5 min → no hace nada (esperamos al próximo tick).
 
-- **Eliminar de la UI** todos los botones de "Sincronizar marcadores en vivo" y "Forzar sync ahora" (Admin.tsx líneas 80-84 y 546). Mantener la pestaña Sync solo como **logs de auditoría** + exports.
-- **Reescribir el edge function `sync-live-matches`** y renombrarlo conceptualmente a flujo "finalize-only":
-  - Ya no consulta partidos `status='live'` ni `scheduled+30min`.
-  - Selecciona partidos con `external_id` cuyo `kickoff_at` esté entre `now() - 4h` y `now() - 100min` (ya pasaron los 90' + descuento + posibles alargues), `status != 'finished'` y `test_mode=false`.
-  - Por cada uno consulta Football-Data; si el upstream `status === 'FINISHED'`, extrae **estrictamente** `score.regularTime.home / regularTime.away` (ignorando `extraTime` y `penalties`). Si `regularTime` no viene, usa `fullTime` solo si `match.score.duration === 'REGULAR'`. Si fue a alargue, sigue tomando `regularTime`.
-  - Marca `status='finished'` y guarda los goles.
-  - Doble pase de seguridad: cada partido elegible se chequea, si la primera llamada no lo encuentra finalizado, se reintenta una segunda vez en la misma corrida tras 8s (la app no usa webhooks ni minuto a minuto).
-- **Cron**: sustituir cualquier polling agresivo por un cron `pg_cron` cada 15 minutos que invoque solo el finalize. (Si no existe, dejarlo documentado en una migración opcional.)
-- En frontend, `useLiveMatches` deja de hacer smart polling de 60s; pasa a un único refetch cada 5 min y on focus, ya que no hay actualizaciones en vivo.
+Ventanas de chequeo por partido (en minutos relativos al kickoff):
+```
+-5, 0, +5    → para detectar arranque (live)
++115, +120, +125 → para detectar final
+```
+Cada tick acepta ±2 min de tolerancia (porque el cron corre cada 1 min, no en el minuto exacto).
 
-## 3) Bots y multiplicadores UCL (script + migración)
+Selección SQL en cada corrida:
+```sql
+select id, external_id, team_a, team_b, status, kickoff_at
+from matches
+where test_mode = false
+  and external_id is not null
+  and status <> 'finished'
+  and (
+        kickoff_at between now() - interval '7 min'  and now() + interval '7 min'   -- ventanas -5, 0, +5
+     or kickoff_at between now() - interval '127 min' and now() - interval '113 min' -- ventanas +115, +120, +125
+  )
+```
 
-**Bots (10 cuentas)**:
-- Crear edge function `seed-test-bots` (admin-only, valida JWT + `has_role admin`) que:
-  1. Crea 10 usuarios `bot01..bot10@prode.test` con `Prode2026!` vía `auth.admin.createUser`, `display_name="🤖 Bot 0X"`, status `approved`.
-  2. Inserta 10 pronósticos distintos para el partido **Bayern vs PSG (id `dae6d78e-...`)** del 2026-05-06.
-- Botón "Crear 10 bots para UCL mañana" en la pestaña Modo Prueba.
+Mantiene rate limiting (espera 6.5s entre llamadas), doble pase para finalize, y registra todo en `sync_logs`.
 
-**Multiplicadores combinados**:
-El usuario pide: Bayern x2 (porque el equipo es Bayern) + partido x1.2 (multiplicador del partido). El esquema actual `multiplier_override` solo tiene un número y ya está en 2. Necesitamos dos campos.
+### b) Cron pg_cron cada 1 minuto
 
-- **Migración SQL**: agregar columna `team_multiplier_override jsonb` a `matches` con forma `{"team":"FC Bayern München","mult":2}` (o `null`). Mantener `multiplier_override` como multiplicador del partido entero.
-- Para el partido Bayern vs PSG (id `dae6d78e-...`) setear: `multiplier_override = 1.2`, `team_multiplier_override = {"team":"FC Bayern München","mult":2}`.
-- Actualizar `calc_points_match` y `calc_points_full` para multiplicar por **ambos** (excluyendo en UCL la lógica genérica de fase, como ya hace hoy). Resultado para Bayern: `base × 2 (equipo) × 1.2 (partido) = base × 2.4`. Para PSG: `base × 1.2`.
-- Reflejar lo mismo en `src/lib/scoring.ts` (`getMatchMultiplier` / `getMultiplierInfo`) para que el badge en la tarjeta muestre `x2.4` con tooltip "Bayern x2 + Especial partido x1.2".
-- Para el resto de los partidos no cambia nada (no tienen `team_multiplier_override` y `multiplier_override` queda null/none).
+Insertar (no migración, porque incluye `apikey`) un cron que llama al edge cada minuto. La función se autoprotege con la query del punto anterior: la mayoría de las veces no hay candidatos y retorna en < 100ms sin gastar cuota de la API.
 
-**Formato de puntos**: `formatPoints` ya hace exactamente lo pedido (entero → "5", decimal → "5,2"). Verificar que se use en todas partes (Ranking, Dashboard, Profile, MatchDetailsDialog, Predictions). Auditar y reemplazar cualquier `toFixed(2)` o `Number(p.points)` crudo restante.
+```sql
+select cron.schedule(
+  'sync-matches-live-finalize',
+  '* * * * *',
+  $$ select net.http_post(
+       url := 'https://bmbxkuiqyqbaviqeauzc.supabase.co/functions/v1/sync-live-matches',
+       headers := '{"Content-Type":"application/json","apikey":"<ANON>"}'::jsonb
+     ); $$
+);
+```
 
-## 4) Permisos de Administrador — Poder Absoluto (`Admin.tsx` + RLS + RPC)
+(Si ya existe un cron viejo apuntando al mismo endpoint, se hace `cron.unschedule` antes.)
 
-Hoy faltan dos cosas:
+### c) Frontend `useLiveMatches`
 
-- **Borrar/bloquear admins**: en `UserRow` (líneas 419-450) los botones "Eliminar" y "Bloquear" se ocultan si `user.is_admin`. Quitar esa restricción. Mantener solo la guardia de seguridad ya implementada en `delete_user_completely` ("no podés eliminarte a vos mismo"). Confirmar con `AlertDialog` doble cuando el target es admin.
-- **Bloquear admin**: usar `set_user_status(user_id, 'rejected')` también para admins.
-- **Modificar pronósticos en cualquier estado**: `EditablePredRow` ya existe y respeta el flujo correcto. Verificar que la policy `predictions_admin_all` permite `UPDATE` (sí lo hace). Permitir también borrado individual con un botón Trash + confirmación.
-- **Modificar resultados manualmente**: `MatchAdminRow` ya lo permite. No requiere cambios.
+Para que el marco rojo aparezca rápido cuando el cron marca `live`, bajar el refetch de **5 min → 60 s** durante la ventana de partidos en curso. Implementación simple: dejar `refetchInterval: 60_000` siempre (la query es liviana y trae todos los partidos en una sola llamada, ya cacheada por React Query).
 
-## 5) Banner informativo en Pronósticos
+### d) Botón manual queda como fallback
 
-Insertar al tope de `Predictions.tsx`, debajo del título, un `Alert` (variante `default` con `Info` icon):
-
-> "Los resultados oficiales (90 min) y el cálculo de puntos se cargarán y mostrarán únicamente al finalizar cada partido."
+En Admin > Sync, dejamos un botón "Sincronizar ahora" que invoca el mismo edge function por si el cron falla.
 
 ---
 
-## Detalle técnico (resumen para implementación)
+## 2) Marco rojo cuando el partido inicia
+
+No hay cambio de código en `Predictions.tsx` (la lógica `derivedState === "EN_JUEGO"` ya pinta el marco rojo). El bug actual es que **nunca se setea `status='live'`** porque el sync solo finaliza. Con el cambio del punto 1, las tarjetas se ponen rojas automáticamente entre los minutos −5 y +5 del kickoff.
+
+---
+
+## 3) Quitar el aviso de "90 min" de Pronósticos
+
+Eliminar el bloque `<div class="rounded-lg border border-primary/30 bg-primary/5 ...">` (líneas 206-212 de `src/pages/Predictions.tsx`) que dice *"Los resultados oficiales (90 min) y el cálculo de puntos se cargarán y mostrarán únicamente al finalizar cada partido"*.
+
+Verificar que el Reglamento (`src/components/TournamentRules.tsx`) ya menciona la regla de los 90' (sí, en la sección "Eliminación directa": *"Se toma el resultado de los 90 minutos reglamentarios"*). Reforzar ese párrafo agregando explícitamente que **los puntos y el resultado oficial se publican únicamente cuando el partido termina**.
+
+---
+
+## 4) Ocultar "Ver pronósticos de los demás" antes del kickoff
+
+Hoy la tarjeta muestra el botón en cualquier estado distinto de ABIERTO, lo que incluye CERRADO durante la hora previa al partido. Cambio en `src/pages/Predictions.tsx`:
+
+```tsx
+// Antes:
+{derivedState !== "ABIERTO" && (<MatchDetailsDialog ... />)}
+
+// Después: solo cuando ya empezó o terminó
+{(derivedState === "EN_JUEGO" || derivedState === "FINALIZADO") && (
+  <MatchDetailsDialog ... />
+)}
+```
+
+Los partidos en CERRADO (1 h antes del kickoff y antes de que el sync los marque `live`) no muestran el botón. El usuario ve solamente su propio pronóstico bloqueado, y el botón aparece automáticamente cuando el partido pasa a EN_JUEGO o FINALIZADO.
+
+---
+
+## Detalle técnico (resumen)
 
 ```text
 Archivos a modificar:
-  src/pages/Predictions.tsx          (estados, banner, ocultar score en live, "ver detalles" en cerrado)
-  src/components/MatchDetailsDialog.tsx (prop hideRealScore + botón configurable)
-  src/pages/Admin.tsx                (quitar botones sync, permitir borrar/bloquear admins, botón bots)
-  src/lib/scoring.ts                 (combinar team + match override)
-  src/hooks/useLiveMatches.ts        (sin polling agresivo)
-  supabase/functions/sync-live-matches/index.ts  (finalize-only + regularTime estricto + doble pase)
+  supabase/functions/sync-live-matches/index.ts   (live + finalize, ventanas -5/0/+5 y +115/+120/+125)
+  src/pages/Predictions.tsx                        (quitar banner 90', cambiar condición del botón "Ver pronósticos")
+  src/components/TournamentRules.tsx               (reforzar nota sobre publicación de resultado/puntos)
+  src/hooks/useLiveMatches.ts                      (refetch 60s en lugar de 5min)
 
-Archivos a crear:
-  supabase/functions/seed-test-bots/index.ts     (10 bots + 10 predicciones UCL)
+SQL (vía supabase--insert, NO migración, porque incluye apikey):
+  - cron.unschedule de cualquier job previo apuntando al endpoint.
+  - cron.schedule 'sync-matches-live-finalize' cada 1 minuto.
 
-Migraciones SQL:
-  - ALTER TABLE matches ADD COLUMN team_multiplier_override jsonb;
-  - CREATE OR REPLACE FUNCTION calc_points_match(...) — incluir team_multiplier_override;
-  - CREATE OR REPLACE FUNCTION calc_points_full(...) — pasar team_multiplier_override;
-  - UPDATE trigger recalc_predictions_for_match para disparar también si cambia team_multiplier_override.
-  - (data) UPDATE matches SET multiplier_override=1.2, team_multiplier_override='{"team":"FC Bayern München","mult":2}' WHERE id='dae6d78e-7ff7-4281-a307-b8230e486bc4';
+Sin cambios:
+  - Esquema de tablas.
+  - Funciones de scoring.
+  - Política RLS.
 ```
 
-## Pregunta abierta
+## Cuota API estimada
 
-El partido **Arsenal vs Atlético** (5 may, ya finalizado, con `multiplier_override=1.2`) lo dejo tal cual (tu pedido anterior). ¿Confirmás?
+Plan free Football-Data = 10 req/min, 100 req/día. Con esta política, por **cada** partido se gastan máximo 6 requests (3 para detectar live + 3 para finalize). En un día con 4 partidos UCL = 24 requests. Holgado.
