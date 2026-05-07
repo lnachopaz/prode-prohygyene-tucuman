@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Loader2, MailCheck, Eye, EyeOff, Check, X } from "lucide-react";
+import { Loader2, MailCheck, Eye, EyeOff, Check, X, KeyRound } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import logo from "@/assets/prohygiene-logo.png";
 
 export default function Auth() {
@@ -16,6 +17,11 @@ export default function Auth() {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
+
+  // forgot password
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [sendingReset, setSendingReset] = useState(false);
 
   // login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -69,6 +75,20 @@ export default function Auth() {
     if (error) return toast.error(error.message);
     toast.success("¡Bienvenido!");
     navigate("/");
+  }
+
+  async function handleSendReset(e: React.FormEvent) {
+    e.preventDefault();
+    const email = forgotEmail.trim();
+    if (!email) return toast.error("Ingresá tu email");
+    setSendingReset(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setSendingReset(false);
+    if (error) return toast.error(error.message);
+    toast.success("Te enviamos un email con el enlace para restablecer tu contraseña.");
+    setForgotOpen(false);
   }
 
   async function handleSignUp(e: React.FormEvent) {
@@ -173,6 +193,48 @@ export default function Auth() {
                         {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
+                  </div>
+                  <div className="flex justify-end -mt-2">
+                    <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+                      <DialogTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => setForgotEmail(loginEmail)}
+                        >
+                          ¿Olvidaste tu contraseña?
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <KeyRound className="h-5 w-5 text-primary" />
+                            Recuperar contraseña
+                          </DialogTitle>
+                          <DialogDescription>
+                            Ingresá tu email y te enviaremos un enlace para crear una nueva contraseña.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleSendReset} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="forgotEmail">Email</Label>
+                            <Input
+                              id="forgotEmail"
+                              type="email"
+                              required
+                              value={forgotEmail}
+                              onChange={(e) => setForgotEmail(e.target.value)}
+                            />
+                          </div>
+                          <DialogFooter>
+                            <Button type="submit" disabled={sendingReset} className="w-full sm:w-auto">
+                              {sendingReset && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                              Enviar enlace
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                   <Button type="submit" className="w-full" disabled={busy}>
                     {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
