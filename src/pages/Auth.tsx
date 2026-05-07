@@ -77,6 +77,20 @@ export default function Auth() {
     navigate("/");
   }
 
+  async function handleSendReset(e: React.FormEvent) {
+    e.preventDefault();
+    const email = forgotEmail.trim();
+    if (!email) return toast.error("Ingresá tu email");
+    setSendingReset(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setSendingReset(false);
+    if (error) return toast.error(error.message);
+    toast.success("Te enviamos un email con el enlace para restablecer tu contraseña.");
+    setForgotOpen(false);
+  }
+
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return toast.error("Ingresá tu nombre");
