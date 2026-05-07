@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Loader2, MailCheck, Eye, EyeOff, Check, X } from "lucide-react";
+import { Loader2, MailCheck, Eye, EyeOff, Check, X, KeyRound } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import logo from "@/assets/prohygiene-logo.png";
 
 export default function Auth() {
@@ -16,6 +17,11 @@ export default function Auth() {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
+
+  // forgot password
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [sendingReset, setSendingReset] = useState(false);
 
   // login state
   const [loginEmail, setLoginEmail] = useState("");
