@@ -72,6 +72,11 @@ function MatchesAdmin() {
       </div>
       <div className="flex flex-wrap gap-2">
         <NewMatchDialog onCreated={() => qc.invalidateQueries({ queryKey: ["admin-matches"] })} />
+        <SyncMatchesButton onDone={() => {
+          qc.invalidateQueries({ queryKey: ["admin-matches"] });
+          qc.invalidateQueries({ queryKey: ["matches"] });
+          qc.invalidateQueries({ queryKey: ["sync-logs"] });
+        }} />
       </div>
 
       {isLoading ? (
@@ -89,6 +94,25 @@ function MatchesAdmin() {
         </div>
       )}
     </div>
+  );
+}
+
+function SyncMatchesButton({ onDone }: { onDone: () => void }) {
+  const [loading, setLoading] = useState(false);
+  async function run() {
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke("sync-live-matches");
+    setLoading(false);
+    if (error) return toast.error(error.message);
+    const updated = (data as any)?.updated ?? 0;
+    toast.success(updated > 0 ? `Sync OK · ${updated} actualizado(s)` : "Sync OK · sin cambios");
+    onDone();
+  }
+  return (
+    <Button variant="outline" onClick={run} disabled={loading}>
+      {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+      Sync partidos
+    </Button>
   );
 }
 

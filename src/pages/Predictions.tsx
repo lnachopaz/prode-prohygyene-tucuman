@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save, Lock, X, Pencil, Sparkles } from "lucide-react";
+import { Loader2, Save, Lock, X, Pencil, Sparkles, Calendar } from "lucide-react";
 import { MatchDetailsDialog } from "@/components/MatchDetailsDialog";
 import { toast } from "sonner";
 import { format, isAfter, subHours } from "date-fns";
@@ -257,7 +257,8 @@ export default function Predictions() {
       ) : (
         grouped.map(([date, dayMatches]) => (
           <section key={date} className="space-y-3">
-            <h2 className="text-lg font-semibold capitalize text-muted-foreground">
+            <h2 className="text-lg font-semibold capitalize text-muted-foreground flex items-center gap-2">
+              <Calendar className="h-4 w-4 shrink-0" />
               {(() => {
                 const [y, mo, d] = date.split("-").map(Number);
                 return format(new Date(y, mo - 1, d, 12), "EEEE d 'de' MMMM yyyy", { locale: es });
@@ -568,7 +569,7 @@ function ScoreInput({
         type="number"
         min={0}
         inputMode="numeric"
-        className="w-12 sm:w-14 text-center text-xl font-bold h-10 px-1"
+        className="w-12 sm:w-14 text-center text-xl font-bold h-10 px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
