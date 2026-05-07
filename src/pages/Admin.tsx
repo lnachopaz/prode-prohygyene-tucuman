@@ -37,15 +37,13 @@ export default function Admin() {
           <TabsTrigger value="matches">Partidos</TabsTrigger>
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="predictions">Pronósticos</TabsTrigger>
-          <TabsTrigger value="codes">Códigos admin</TabsTrigger>
-          <TabsTrigger value="sync">Sync &amp; Export</TabsTrigger>
+          <TabsTrigger value="codes">Export &amp; Código</TabsTrigger>
           <TabsTrigger value="test">🧪 Modo prueba</TabsTrigger>
         </TabsList>
         <TabsContent value="matches" className="mt-4"><MatchesAdmin /></TabsContent>
         <TabsContent value="users" className="mt-4"><UsersAdmin /></TabsContent>
         <TabsContent value="predictions" className="mt-4"><PredictionsAdmin /></TabsContent>
         <TabsContent value="codes" className="mt-4"><CodesAdmin /></TabsContent>
-        <TabsContent value="sync" className="mt-4"><SyncAdmin /></TabsContent>
         <TabsContent value="test" className="mt-4"><TestModeAdmin /></TabsContent>
       </Tabs>
     </div>
