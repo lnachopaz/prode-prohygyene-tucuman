@@ -72,6 +72,11 @@ function MatchesAdmin() {
       </div>
       <div className="flex flex-wrap gap-2">
         <NewMatchDialog onCreated={() => qc.invalidateQueries({ queryKey: ["admin-matches"] })} />
+        <SyncMatchesButton onDone={() => {
+          qc.invalidateQueries({ queryKey: ["admin-matches"] });
+          qc.invalidateQueries({ queryKey: ["matches"] });
+          qc.invalidateQueries({ queryKey: ["sync-logs"] });
+        }} />
       </div>
 
       {isLoading ? (
