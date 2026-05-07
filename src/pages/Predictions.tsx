@@ -203,14 +203,6 @@ export default function Predictions() {
         <p className="text-muted-foreground">Cargá tus marcadores antes del cierre (1 hora antes del partido).</p>
       </div>
 
-      <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
-        <strong className="text-foreground">Importante:</strong>{" "}
-        <span className="text-muted-foreground">
-          Los resultados oficiales (90 min) y el cálculo de puntos se cargarán y mostrarán
-          únicamente al finalizar cada partido.
-        </span>
-      </div>
-
       <div className="flex flex-wrap gap-2 items-center">
         <Select value={stageFilter} onValueChange={setStageFilter}>
           <SelectTrigger className="w-[180px]"><SelectValue placeholder="Etapa" /></SelectTrigger>
