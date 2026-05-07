@@ -88,13 +88,62 @@ export default function Auth() {
     const email = forgotEmail.trim();
     if (!email) return toast.error("Ingresá tu email");
     setSendingReset(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    // Sin redirectTo => Supabase envía el código OTP de 6 dígitos en el email
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
     setSendingReset(false);
     if (error) return toast.error(error.message);
-    toast.success("Te enviamos un email con el enlace para restablecer tu contraseña.");
+    toast.success("Te enviamos un código de 6 dígitos por email.");
+    setForgotStep("code");
+  }
+
+  const newPwdRules = [
+    { label: "Al menos 8 caracteres", test: (p: string) => p.length >= 8 },
+    { label: "Una letra mayúscula", test: (p: string) => /[A-Z]/.test(p) },
+    { label: "Una letra minúscula", test: (p: string) => /[a-z]/.test(p) },
+    { label: "Un número", test: (p: string) => /\d/.test(p) },
+  ];
+  const newPwdValid = newPwdRules.every((r) => r.test(newPwd));
+  const newPwdMatches = newPwd.length > 0 && newPwd === newPwdConfirm;
+
+  async function handleVerifyOtpAndReset(e: React.FormEvent) {
+    e.preventDefault();
+    const code = otpCode.trim();
+    if (code.length !== 6) return toast.error("Ingresá el código de 6 dígitos");
+    if (!newPwdValid) return toast.error("La contraseña no cumple los requisitos");
+    if (!newPwdMatches) return toast.error("Las contraseñas no coinciden");
+    setVerifyingOtp(true);
+    const { error: verifyErr } = await supabase.auth.verifyOtp({
+      email: forgotEmail.trim(),
+      token: code,
+      type: "recovery",
+    });
+    if (verifyErr) {
+      setVerifyingOtp(false);
+      return toast.error(verifyErr.message || "Código inválido o expirado");
+    }
+    const { error: updErr } = await supabase.auth.updateUser({ password: newPwd });
+    if (updErr) {
+      setVerifyingOtp(false);
+      return toast.error(updErr.message);
+    }
+    await supabase.auth.signOut();
+    setVerifyingOtp(false);
+    toast.success("Contraseña actualizada. Iniciá sesión con la nueva.");
     setForgotOpen(false);
+    setForgotStep("email");
+    setOtpCode("");
+    setNewPwd("");
+    setNewPwdConfirm("");
+  }
+
+  function resetForgotDialog(open: boolean) {
+    setForgotOpen(open);
+    if (!open) {
+      setForgotStep("email");
+      setOtpCode("");
+      setNewPwd("");
+      setNewPwdConfirm("");
+    }
   }
 
   async function handleSignUp(e: React.FormEvent) {
