@@ -72,11 +72,12 @@ export function TournamentRules() {
 
         <section>
           <h3 className="font-semibold flex items-center gap-2 mb-2">
-            <Trophy className="h-4 w-4 text-primary" /> Eliminación directa
+            <Trophy className="h-4 w-4 text-primary" /> Eliminación directa y resultado oficial
           </h3>
           <ul className="space-y-1 text-muted-foreground">
             <li>• Se toma el resultado de los <strong>90 minutos reglamentarios</strong>.</li>
-            <li>• Los <strong>penales no se consideran</strong> para la suma de puntos.</li>
+            <li>• Los <strong>alargues y penales no se consideran</strong> para la suma de puntos.</li>
+            <li>• <strong>El resultado oficial y el cálculo de puntos se publican únicamente cuando el partido finaliza.</strong> Mientras el partido está en curso, no se muestra el marcador en vivo.</li>
             <li>• El ranking se actualiza de forma automática en la página del torneo.</li>
           </ul>
         </section>
