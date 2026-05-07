@@ -419,7 +419,7 @@ function MatchCard({
     <Card
       className={`overflow-hidden transition-shadow ${
         isArgentina ? "border-2 border-sky-400 shadow-[0_0_0_1px_hsl(var(--background)),0_4px_12px_-2px_rgb(56_189_248/0.4)]" : ""
-      } ${derivedState === "EN_JUEGO" ? "border-2 border-destructive shadow-[0_0_0_1px_hsl(var(--background)),0_4px_12px_-2px_hsl(var(--destructive)/0.5)]" : ""}`}
+      } ${derivedState === "EN_JUEGO" ? "border border-destructive/40 shadow-[0_0_0_1px_hsl(var(--background)),0_2px_8px_-2px_hsl(var(--destructive)/0.25)]" : ""}`}
     >
       <CardContent className="p-3 sm:p-4 space-y-3">
         {/* Header: fase + grupo + estado */}
