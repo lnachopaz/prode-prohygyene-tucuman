@@ -1,93 +1,55 @@
-## Objetivo
-
-Garantizar que cuando un partido arranca pase a **EN JUEGO** (recuadro rojo) y que al terminar se cargue automáticamente el marcador de los 90′. Hoy esto no funciona porque el edge function deployado quedó desactualizado.
-
----
-
-## Diagnóstico
-
-1. El cron `sync-matches-live-finalize` corre cada 1 min ✅
-2. El archivo `supabase/functions/sync-live-matches/index.ts` ya tiene la lógica nueva (ventanas −7/+7 min para live y −127/−113 min para finalize) ✅
-3. **Pero el deploy quedó en el código viejo**: la última respuesta es *"No hay partidos pendientes de finalizar"* y los logs muestran *"no matches in finalize window"* — frases que ya no existen en el código actual. Esto explica por qué nunca se marca `status='live'` y el recuadro rojo nunca aparece.
-4. El único partido real próximo es **Levante vs Osasuna** mañana viernes 16:00 hs ARG (~29 h). No alcanza con esperar: hay que validar la mecánica antes.
-
----
-
 ## Plan
 
-### 1) Forzar redeploy del edge function
+### 1. Restaurar Levante vs Osasuna a su horario real (Football-Data)
 
-Tocar `supabase/functions/sync-live-matches/index.ts` (agregar versión en un comentario, sin cambiar la lógica) para que el sistema lo redeploye. Verificar con un POST manual que la respuesta nueva sea `{"updated":0, "message":"Sin partidos en ventana."}` (texto del código nuevo).
+Actualmente el partido `external_id = 'fd-544554'` está con `kickoff_at` simulado y `status='live'` a partir de las pruebas anteriores. Hay que devolverlo a su horario oficial para que el ciclo natural lo dispare:
 
-### 2) Verificar live-detection con Levante (sin tocar la base de datos del usuario)
+- `UPDATE matches SET kickoff_at = '2026-05-08T19:00:00Z', status='scheduled', score_a=NULL, score_b=NULL WHERE external_id='fd-544554';`
 
-Test temporal y reversible:
+Con esto, el cron `sync-live-matches` (cada minuto) lo detectará automáticamente cuando entre en la ventana ±7 min del kickoff y lo marcará `live`; luego, ~115/120/125 min después leerá `score.regularTime` y lo finalizará con los puntos recalculados.
 
-```text
-a. Anotar kickoff_at original de Levante vs Osasuna  → 2026-05-08T19:00:00Z
-b. UPDATE matches SET kickoff_at = now() - interval '1 minute'
-   WHERE external_id = 'fd-544554'
-c. Esperar al próximo tick del cron (≤60 s) o disparar el botón
-   "Sync partidos" en Admin.
-d. Verificar:
-     - status = 'live' en la tabla matches
-     - en /predictions, la tarjeta tiene marco rojo + badge "EN JUEGO"
-     - sync_logs muestra action='marked-live'
-e. Si Football-Data devuelve SCHEDULED (porque en la realidad el partido
-   todavía no empezó), nuestro código no lo marca live. En ese caso usar
-   la opción B (más abajo).
-f. Restaurar: UPDATE matches SET kickoff_at = '2026-05-08T19:00:00Z',
-   status = 'scheduled' WHERE external_id = 'fd-544554'.
-```
+### 2. Mover el ícono del calendario dentro del recuadro del partido
 
-**Opción B (si el upstream no coopera con la simulación)**: marcar manualmente `status='live'` desde el botón Admin existente y validar visualmente que el frontend muestra el recuadro rojo, badge "EN JUEGO" y oculta el marcador real (verifica solo la UI, no la sincronización).
+En `src/pages/Predictions.tsx`:
 
-### 3) Verificar finalize-detection con Levante
+- En el header del agrupador por fecha (`<h2>` línea 260-266): **quitar** el `<Calendar />` — solo queda el texto de la fecha.
+- En el header del `MatchCard` (líneas 426-436): debajo de la línea "Fase · Grupo" agregar una nueva línea con `<Calendar className="h-3 w-3" />` + `formatAR(kickoff_at, "EEE dd/MM · HH:mm 'hs'")`. La línea de "EEE dd/MM · HH:mm hs" ya existente queda igual o se reemplaza, manteniendo solo una con el ícono.
+
+Resultado:
 
 ```text
-a. UPDATE matches SET kickoff_at = now() - interval '120 minutes',
-   status = 'live' WHERE external_id = 'fd-544554'
-b. Disparar "Sync partidos".
-c. Si Football-Data devuelve FINISHED para ese partido, nuestro código
-   debería:
-     - extraer score.regularTime
-     - actualizar matches: status='finished', score_a, score_b
-     - el trigger recalc_predictions_for_match recalcula puntos
-d. Si el upstream sigue SCHEDULED (porque en la vida real no se jugó),
-   no podemos validar la finalización contra la API real con este
-   partido. En ese caso ver Opción C.
-e. Restaurar el kickoff y status originales.
+Fuera del recuadro:  jueves 11 de junio 2026
+Dentro del recuadro: Fase de Grupos · Grupo A
+                     📅 jue 11/06 · 16:00 hs · México DF
 ```
 
-**Opción C (validar finalize sin depender del upstream)**: agregar un test temporal con un partido ya jugado de fecha pasada (ej. una jornada de La Liga ya terminada) creado en modo `test_mode=false` y con `external_id` real. Simular ventana finalize moviendo `kickoff_at` a `now() − 120 min` y comprobar que el sync trae el score real. Borrarlo al terminar el test.
+### 3. Permitir al admin borrar pronósticos de los usuarios
 
-### 4) Quick win adicional: log más explícito
+En `src/pages/Admin.tsx`, dentro de `EditablePredRow` (líneas 1024-1161):
 
-Mientras tocamos el edge function para redeploy, agregar un `console.log` con cantidad de candidatos y acción tomada por cada uno, para que la próxima vez el debug sea instantáneo desde edge-function-logs (hoy solo se ve "booted/shutdown").
+- Agregar un botón "Borrar" (ícono `Trash2`) al lado del lápiz de edición.
+- Al confirmar, ejecuta `supabase.rpc("admin_delete_prediction", { _prediction_id: row.id })` (la función ya existe en la base) y luego invalida `["pred-admin-rows"]` y `["ranking-leaderboard"]`.
+- Confirmación con `AlertDialog`: "Borrar el pronóstico de {userName} para {team_a} vs {team_b}. El usuario aparecerá como si no hubiera cargado nada. Esta acción no se puede deshacer."
 
----
+### 4. Reorganizar tabs: eliminar "Sync & Export" y mover los backups a "Códigos admin" → "Export & Código"
 
-## Detalle técnico
+En `src/pages/Admin.tsx`:
 
-```text
-Archivos a tocar:
-  supabase/functions/sync-live-matches/index.ts
-    - bump de versión en comentario header (forza redeploy)
-    - logs adicionales (console.log con candidatos y resultados)
+- En la `TabsList` (línea 36-43): **eliminar** `<TabsTrigger value="sync">Sync & Export</TabsTrigger>` y renombrar `<TabsTrigger value="codes">Códigos admin</TabsTrigger>` → `Export & Código`.
+- Eliminar `<TabsContent value="sync">…</TabsContent>` (línea 48).
+- La función `SyncAdmin` se elimina (incluyendo el card "Sincronización (solo al finalizar)" y los logs). **Nota**: el botón manual "Sync partidos" en la pestaña Partidos ya cubre la sincronización manual; los logs dejan de mostrarse en UI (siguen quedando en la base por si hace falta debug futuro).
+- Las funciones `BackupAllPredictions` y `ExportRanking` se mueven a `CodesAdmin`: se renderizan dentro del componente, debajo del bloque de "Nuevo código" + listado de códigos.
+- Cambiar el título de la sección/header de la pestaña en `CodesAdmin` para que se vea claramente que ahora es "Export & Códigos de Admin" (separadores con `<h3>` o `<Card>` por bloque).
 
-SQL temporal (vía supabase--insert, no migración):
-  - UPDATE de kickoff_at en Levante para simular ventanas live y finalize.
-  - Restauración al kickoff original.
+### Detalles técnicos
 
-Sin cambios en:
-  - Esquema de la base de datos.
-  - Lógica de scoring.
-  - Componentes de UI (la lógica del recuadro rojo y la badge "EN JUEGO"
-    ya están bien — el bug es 100% del backend / deploy).
-```
+- Los puntos se recalculan automáticamente al borrar el pronóstico (no hay puntos al no existir el row). Para el partido finalizado: el ranking se actualiza al invalidar las queries.
+- La RPC `admin_delete_prediction(_prediction_id uuid)` ya está creada con `has_role(auth.uid(),'admin')`.
+- No se modifican RLS ni esquema. Solo cambios de UI + 1 update SQL para Levante.
+- Edge function `sync-live-matches` no cambia: ya está en v2 con ventanas correctas.
 
-## Criterio de éxito
+### Archivos a modificar
 
-- POST a `/sync-live-matches` responde con el mensaje del código nuevo.
-- Al simular kickoff hace 1 min, el partido pasa a `status='live'` en ≤60 s y la tarjeta de pronósticos muestra recuadro rojo + badge "EN JUEGO" + esconde el marcador real.
-- Al simular kickoff hace 120 min, el partido pasa a `status='finished'` con `score_a` y `score_b` extraídos de `score.regularTime`, y los puntos se recalculan automáticamente.
+- `src/pages/Predictions.tsx` (íconos calendario)
+- `src/pages/Admin.tsx` (tabs, mover componentes, botón borrar)
+- 1 update SQL vía `supabase--insert` para restaurar el partido del Levante.
