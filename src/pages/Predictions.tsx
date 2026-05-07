@@ -257,8 +257,7 @@ export default function Predictions() {
       ) : (
         grouped.map(([date, dayMatches]) => (
           <section key={date} className="space-y-3">
-            <h2 className="text-lg font-semibold capitalize text-muted-foreground flex items-center gap-2">
-              <Calendar className="h-4 w-4 shrink-0" />
+            <h2 className="text-lg font-semibold capitalize text-muted-foreground">
               {(() => {
                 const [y, mo, d] = date.split("-").map(Number);
                 return format(new Date(y, mo - 1, d, 12), "EEEE d 'de' MMMM yyyy", { locale: es });
@@ -429,7 +428,8 @@ function MatchCard({
               {match.stage}
               {match.group_name ? ` · ${match.group_name}` : ""}
             </div>
-            <div className="text-muted-foreground mt-0.5 flex items-center flex-wrap gap-x-2">
+            <div className="text-muted-foreground mt-0.5 flex items-center flex-wrap gap-x-1.5">
+              <Calendar className="h-3 w-3 shrink-0" />
               <span>{formatAR(match.kickoff_at, "EEE dd/MM · HH:mm 'hs'")}</span>
               {match.venue && <span className="truncate">· {match.venue}</span>}
             </div>

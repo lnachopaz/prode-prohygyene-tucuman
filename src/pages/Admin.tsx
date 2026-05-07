@@ -37,15 +37,13 @@ export default function Admin() {
           <TabsTrigger value="matches">Partidos</TabsTrigger>
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="predictions">Pronósticos</TabsTrigger>
-          <TabsTrigger value="codes">Códigos admin</TabsTrigger>
-          <TabsTrigger value="sync">Sync &amp; Export</TabsTrigger>
+          <TabsTrigger value="codes">Export &amp; Código</TabsTrigger>
           <TabsTrigger value="test">🧪 Modo prueba</TabsTrigger>
         </TabsList>
         <TabsContent value="matches" className="mt-4"><MatchesAdmin /></TabsContent>
         <TabsContent value="users" className="mt-4"><UsersAdmin /></TabsContent>
         <TabsContent value="predictions" className="mt-4"><PredictionsAdmin /></TabsContent>
         <TabsContent value="codes" className="mt-4"><CodesAdmin /></TabsContent>
-        <TabsContent value="sync" className="mt-4"><SyncAdmin /></TabsContent>
         <TabsContent value="test" className="mt-4"><TestModeAdmin /></TabsContent>
       </Tabs>
     </div>
@@ -498,30 +496,35 @@ function CodesAdmin() {
   }
 
   return (
-    <div className="space-y-4 max-w-xl">
-      <Card>
-        <CardHeader><CardTitle className="text-base">Nuevo código</CardTitle></CardHeader>
-        <CardContent className="flex gap-2">
-          <Input value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="ej: PH-ADMIN-2026" />
-          <Button onClick={add}><Plus className="h-4 w-4 mr-2" />Crear</Button>
-        </CardContent>
-      </Card>
-      <div className="space-y-2">
-        {codes?.map((c) => (
-          <Card key={c.id}>
-            <CardContent className="p-3 flex items-center gap-2">
-              <code className="flex-1 font-mono">{c.code}</code>
-              {c.active ? <Badge className="bg-success text-success-foreground">Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>}
-              <Button size="sm" variant="outline" onClick={() => toggle(c.id, c.active)}>
-                {c.active ? "Desactivar" : "Activar"}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => remove(c.id)}>
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+    <div className="space-y-6 max-w-3xl">
+      <div className="space-y-4 max-w-xl">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Nuevo código</CardTitle></CardHeader>
+          <CardContent className="flex gap-2">
+            <Input value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="ej: PH-ADMIN-2026" />
+            <Button onClick={add}><Plus className="h-4 w-4 mr-2" />Crear</Button>
+          </CardContent>
+        </Card>
+        <div className="space-y-2">
+          {codes?.map((c) => (
+            <Card key={c.id}>
+              <CardContent className="p-3 flex items-center gap-2">
+                <code className="flex-1 font-mono">{c.code}</code>
+                {c.active ? <Badge className="bg-success text-success-foreground">Activo</Badge> : <Badge variant="secondary">Inactivo</Badge>}
+                <Button size="sm" variant="outline" onClick={() => toggle(c.id, c.active)}>
+                  {c.active ? "Desactivar" : "Activar"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => remove(c.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
+
+      <ExportRanking />
+      <BackupAllPredictions />
     </div>
   );
 }
@@ -1038,7 +1041,23 @@ function EditablePredRow({
   const [b, setB] = useState(String(row.pred_b));
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
+  async function doDelete() {
+    setDeleting(true);
+    const { error } = await supabase.rpc("admin_delete_prediction", { _prediction_id: row.id });
+    setDeleting(false);
+    setDeleteOpen(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Pronóstico eliminado");
+      qc.invalidateQueries({ queryKey: ["pred-admin-rows", userId] });
+      qc.invalidateQueries({ queryKey: ["ranking-leaderboard"] });
+      qc.invalidateQueries({ queryKey: ["ranking-preds-all"] });
+    }
+  }
   function openEdit() {
     setA(String(row.pred_a));
     setB(String(row.pred_b));
@@ -1151,9 +1170,42 @@ function EditablePredRow({
             </Button>
           </div>
         ) : (
-          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={openEdit} title="Editar pronóstico">
-            <Pencil className="h-3 w-3" />
-          </Button>
+          <div className="flex gap-1">
+            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={openEdit} title="Editar pronóstico">
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="ghost" className="h-7 px-2" title="Borrar pronóstico" disabled={deleting}>
+                  {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3 text-destructive" />}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                    ¿Borrar pronóstico?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-2 text-sm">
+                      <p>
+                        Vas a borrar el pronóstico de <strong>{userName}</strong> en{" "}
+                        <strong>{m.team_a} vs {m.team_b}</strong> ({row.pred_a}-{row.pred_b}).
+                        El usuario aparecerá como si no hubiera cargado nada.
+                      </p>
+                      <p className="text-muted-foreground text-xs">Esta acción no se puede deshacer.</p>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={doDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Sí, borrar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         )}
       </div>
     </div>
