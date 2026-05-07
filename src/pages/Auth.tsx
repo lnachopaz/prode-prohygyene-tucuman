@@ -18,10 +18,16 @@ export default function Auth() {
   const [busy, setBusy] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
 
-  // forgot password
+  // forgot password (OTP flow)
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [sendingReset, setSendingReset] = useState(false);
+  const [forgotStep, setForgotStep] = useState<"email" | "code">("email");
+  const [otpCode, setOtpCode] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [newPwdConfirm, setNewPwdConfirm] = useState("");
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   // login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -82,13 +88,62 @@ export default function Auth() {
     const email = forgotEmail.trim();
     if (!email) return toast.error("Ingresá tu email");
     setSendingReset(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    // Sin redirectTo => Supabase envía el código OTP de 6 dígitos en el email
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
     setSendingReset(false);
     if (error) return toast.error(error.message);
-    toast.success("Te enviamos un email con el enlace para restablecer tu contraseña.");
+    toast.success("Te enviamos un código de 6 dígitos por email.");
+    setForgotStep("code");
+  }
+
+  const newPwdRules = [
+    { label: "Al menos 8 caracteres", test: (p: string) => p.length >= 8 },
+    { label: "Una letra mayúscula", test: (p: string) => /[A-Z]/.test(p) },
+    { label: "Una letra minúscula", test: (p: string) => /[a-z]/.test(p) },
+    { label: "Un número", test: (p: string) => /\d/.test(p) },
+  ];
+  const newPwdValid = newPwdRules.every((r) => r.test(newPwd));
+  const newPwdMatches = newPwd.length > 0 && newPwd === newPwdConfirm;
+
+  async function handleVerifyOtpAndReset(e: React.FormEvent) {
+    e.preventDefault();
+    const code = otpCode.trim();
+    if (code.length !== 6) return toast.error("Ingresá el código de 6 dígitos");
+    if (!newPwdValid) return toast.error("La contraseña no cumple los requisitos");
+    if (!newPwdMatches) return toast.error("Las contraseñas no coinciden");
+    setVerifyingOtp(true);
+    const { error: verifyErr } = await supabase.auth.verifyOtp({
+      email: forgotEmail.trim(),
+      token: code,
+      type: "recovery",
+    });
+    if (verifyErr) {
+      setVerifyingOtp(false);
+      return toast.error(verifyErr.message || "Código inválido o expirado");
+    }
+    const { error: updErr } = await supabase.auth.updateUser({ password: newPwd });
+    if (updErr) {
+      setVerifyingOtp(false);
+      return toast.error(updErr.message);
+    }
+    await supabase.auth.signOut();
+    setVerifyingOtp(false);
+    toast.success("Contraseña actualizada. Iniciá sesión con la nueva.");
     setForgotOpen(false);
+    setForgotStep("email");
+    setOtpCode("");
+    setNewPwd("");
+    setNewPwdConfirm("");
+  }
+
+  function resetForgotDialog(open: boolean) {
+    setForgotOpen(open);
+    if (!open) {
+      setForgotStep("email");
+      setOtpCode("");
+      setNewPwd("");
+      setNewPwdConfirm("");
+    }
   }
 
   async function handleSignUp(e: React.FormEvent) {
@@ -195,7 +250,7 @@ export default function Auth() {
                     </div>
                   </div>
                   <div className="flex justify-end -mt-2">
-                    <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+                    <Dialog open={forgotOpen} onOpenChange={resetForgotDialog}>
                       <DialogTrigger asChild>
                         <button
                           type="button"
@@ -212,27 +267,108 @@ export default function Auth() {
                             Recuperar contraseña
                           </DialogTitle>
                           <DialogDescription>
-                            Ingresá tu email y te enviaremos un enlace para crear una nueva contraseña.
+                            {forgotStep === "email"
+                              ? "Ingresá tu email y te enviaremos un código de 6 dígitos."
+                              : `Ingresá el código que enviamos a ${forgotEmail} y elegí una nueva contraseña.`}
                           </DialogDescription>
                         </DialogHeader>
-                        <form onSubmit={handleSendReset} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="forgotEmail">Email</Label>
-                            <Input
-                              id="forgotEmail"
-                              type="email"
-                              required
-                              value={forgotEmail}
-                              onChange={(e) => setForgotEmail(e.target.value)}
-                            />
-                          </div>
-                          <DialogFooter>
-                            <Button type="submit" disabled={sendingReset} className="w-full sm:w-auto">
-                              {sendingReset && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                              Enviar enlace
-                            </Button>
-                          </DialogFooter>
-                        </form>
+                        {forgotStep === "email" ? (
+                          <form onSubmit={handleSendReset} className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="forgotEmail">Email</Label>
+                              <Input
+                                id="forgotEmail"
+                                type="email"
+                                required
+                                value={forgotEmail}
+                                onChange={(e) => setForgotEmail(e.target.value)}
+                              />
+                            </div>
+                            <DialogFooter>
+                              <Button type="submit" disabled={sendingReset} className="w-full sm:w-auto">
+                                {sendingReset && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                Enviar código
+                              </Button>
+                            </DialogFooter>
+                          </form>
+                        ) : (
+                          <form onSubmit={handleVerifyOtpAndReset} className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="otpCode">Código de 6 dígitos</Label>
+                              <Input
+                                id="otpCode"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={6}
+                                required
+                                value={otpCode}
+                                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                                placeholder="123456"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="newPwd">Nueva contraseña</Label>
+                              <div className="relative">
+                                <Input
+                                  id="newPwd"
+                                  type={showNewPwd ? "text" : "password"}
+                                  required
+                                  value={newPwd}
+                                  onChange={(e) => setNewPwd(e.target.value)}
+                                  className="pr-10"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowNewPwd((v) => !v)}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                  tabIndex={-1}
+                                  aria-label={showNewPwd ? "Ocultar" : "Mostrar"}
+                                >
+                                  {showNewPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                              </div>
+                              <ul className="space-y-1 rounded-md border bg-muted/30 p-2 text-xs">
+                                {newPwdRules.map((rule) => {
+                                  const ok = rule.test(newPwd);
+                                  return (
+                                    <li
+                                      key={rule.label}
+                                      className={`flex items-center gap-2 ${ok ? "text-success" : "text-muted-foreground"}`}
+                                    >
+                                      {ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                                      <span>{rule.label}</span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="newPwdConfirm">Repetir contraseña</Label>
+                              <Input
+                                id="newPwdConfirm"
+                                type={showNewPwd ? "text" : "password"}
+                                required
+                                value={newPwdConfirm}
+                                onChange={(e) => setNewPwdConfirm(e.target.value)}
+                              />
+                              {newPwdConfirm.length > 0 && (
+                                <p className={`flex items-center gap-2 text-xs ${newPwdMatches ? "text-success" : "text-destructive"}`}>
+                                  {newPwdMatches ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                                  {newPwdMatches ? "Las contraseñas coinciden" : "Las contraseñas no coinciden"}
+                                </p>
+                              )}
+                            </div>
+                            <DialogFooter className="gap-2 sm:gap-0">
+                              <Button type="button" variant="outline" onClick={() => setForgotStep("email")}>
+                                Reenviar código
+                              </Button>
+                              <Button type="submit" disabled={verifyingOtp}>
+                                {verifyingOtp && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                Cambiar contraseña
+                              </Button>
+                            </DialogFooter>
+                          </form>
+                        )}
                       </DialogContent>
                     </Dialog>
                   </div>
