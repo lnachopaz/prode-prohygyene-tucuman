@@ -1170,9 +1170,42 @@ function EditablePredRow({
             </Button>
           </div>
         ) : (
-          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={openEdit} title="Editar pronóstico">
-            <Pencil className="h-3 w-3" />
-          </Button>
+          <div className="flex gap-1">
+            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={openEdit} title="Editar pronóstico">
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="ghost" className="h-7 px-2" title="Borrar pronóstico" disabled={deleting}>
+                  {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3 text-destructive" />}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                    ¿Borrar pronóstico?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-2 text-sm">
+                      <p>
+                        Vas a borrar el pronóstico de <strong>{userName}</strong> en{" "}
+                        <strong>{m.team_a} vs {m.team_b}</strong> ({row.pred_a}-{row.pred_b}).
+                        El usuario aparecerá como si no hubiera cargado nada.
+                      </p>
+                      <p className="text-muted-foreground text-xs">Esta acción no se puede deshacer.</p>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={doDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Sí, borrar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         )}
       </div>
     </div>
