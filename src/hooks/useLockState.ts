@@ -29,15 +29,16 @@ export function useLockState(match: MatchInput, predWindow?: PredictionWindowInp
   const lockedByAdmin = lockMode === "force_closed";
   const forcedOpen = lockMode === "force_open" && match.status === "scheduled";
 
+  // La ventana sólo determina cuándo ABRE — el cierre siempre es 1h antes del partido.
   const windowOpen = !predWindow
     ? true
-    : now >= new Date(predWindow.opens_at) && now <= new Date(predWindow.closes_at);
+    : now >= new Date(predWindow.opens_at);
   const windowNotYetOpen = predWindow ? now < new Date(predWindow.opens_at) : false;
-  const windowClosed = predWindow ? now > new Date(predWindow.closes_at) : false;
+  const windowClosed = false;
 
   const locked = lockedByAdmin || (!forcedOpen && (timeLocked || !windowOpen));
-  const closedByTime = !isAfter(lockAt, now) || windowClosed;
-  const closesAt = predWindow ? new Date(predWindow.closes_at) : lockAt;
+  const closedByTime = !isAfter(lockAt, now);
+  const closesAt = lockAt;
 
   return {
     now,
