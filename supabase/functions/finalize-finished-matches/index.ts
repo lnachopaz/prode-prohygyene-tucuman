@@ -81,12 +81,14 @@ Deno.serve(async (req) => {
           if (!["FINISHED", "AWARDED"].includes(upstreamStatus)) {
             results.push({ id: m.id, ok: true, status: upstreamStatus, score: "skip-not-finished" });
           } else {
-            // Estricto: 90 min reglamentarios. Football-Data: `regularTime` cuando existe, sino `fullTime`.
-            // En v4, `regularTime` solo aparece si hubo extra/penales; si no, `fullTime` ya es 90'.
-            const reg = data.score?.regularTime;
+            // Football-Data v4: `fullTime` = resultado al 90'. `regularTime` solo es válido
+            // cuando `duration` es EXTRA_TIME o PENALTY_SHOOTOUT (sino aparece como 0-0 basura).
+            const duration = (data.score?.duration ?? "REGULAR").toUpperCase();
             const ft = data.score?.fullTime;
-            const score_a = reg?.home ?? ft?.home ?? null;
-            const score_b = reg?.away ?? ft?.away ?? null;
+            const reg = data.score?.regularTime;
+            const useReg = duration === "EXTRA_TIME" || duration === "PENALTY_SHOOTOUT";
+            const score_a = (useReg ? reg?.home : ft?.home) ?? ft?.home ?? null;
+            const score_b = (useReg ? reg?.away : ft?.away) ?? ft?.away ?? null;
 
             const { error: upErr } = await admin
               .from("matches")

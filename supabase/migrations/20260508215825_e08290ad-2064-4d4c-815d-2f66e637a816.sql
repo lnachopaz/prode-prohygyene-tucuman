@@ -1,0 +1,1 @@
+UPDATE public.matches SET score_a = 3, score_b = 2, status = 'finished', updated_at = now() WHERE id = '26ee0777-1650-4d1d-81ca-a07e8e2fe2e7';
