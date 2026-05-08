@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tipografías "clásico mundialista": display condensada + heading + body */
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    /* Paleta Prohygiene Tucumán — azul profundo + celeste */
+    --background: 210 35% 98%;
+    --foreground: 215 45% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 45% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 45% 10%;
+
+    /* Azul PH (primary) */
+    --primary: 215 65% 32%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 215 60% 42%;
+
+    --secondary: 210 20% 94%;
+    --secondary-foreground: 215 45% 12%;
+
+    --muted: 210 15% 94%;
+    --muted-foreground: 215 12% 40%;
+
+    --accent: 215 65% 32%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 65% 38%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 215 45% 12%;
+
+    /* Acentos PH — celeste como acento principal */
+    --gold: 198 75% 58%;
+    --gold-foreground: 215 45% 10%;
+    --argentina-blue: 200 78% 60%;
+    --argentina-blue-foreground: 0 0% 100%;
+    --pitch-line: 0 0% 100%;
+
+    --border: 215 15% 87%;
+    --input: 215 15% 87%;
+    --ring: 215 65% 32%;
+
+    --radius: 0.625rem;
+
+    --shadow-sm: 0 1px 2px 0 hsl(215 45% 10% / 0.05);
+    --shadow-md: 0 4px 12px -2px hsl(215 45% 10% / 0.08);
+    --shadow-lg: 0 12px 32px -8px hsl(215 45% 10% / 0.18);
+    --gradient-primary: linear-gradient(135deg, hsl(215 65% 32%) 0%, hsl(215 60% 42%) 100%);
+    --gradient-pitch: linear-gradient(180deg, hsl(215 65% 28%) 0%, hsl(215 65% 22%) 100%);
+  }
+
+  .dark {
+    --background: 215 30% 8%;
+    --foreground: 210 15% 95%;
+
+    --card: 215 28% 11%;
+    --card-foreground: 210 15% 95%;
+
+    --popover: 215 28% 11%;
+    --popover-foreground: 210 15% 95%;
+
+    --primary: 215 60% 50%;
+    --primary-foreground: 215 30% 8%;
+    --primary-glow: 215 65% 60%;
+
+    --secondary: 215 22% 15%;
+    --secondary-foreground: 210 15% 95%;
+
+    --muted: 215 18% 16%;
+    --muted-foreground: 210 10% 68%;
+
+    --accent: 215 60% 50%;
+    --accent-foreground: 215 30% 8%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 60% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 90% 55%;
+    --warning-foreground: 215 30% 8%;
+
+    --gold: 198 75% 65%;
+    --gold-foreground: 215 30% 8%;
+    --argentina-blue: 200 80% 65%;
+    --argentina-blue-foreground: 215 30% 8%;
+    --pitch-line: 0 0% 100%;
+
+    --border: 215 20% 20%;
+    --input: 215 20% 20%;
+    --ring: 215 60% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-heading tracking-tight;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'Anton', 'Oswald', system-ui, sans-serif;
+    letter-spacing: 0.02em;
+  }
+  .font-heading {
+    font-family: 'Oswald', 'Inter', system-ui, sans-serif;
+    font-weight: 600;
+  }
+  .text-gold {
+    color: hsl(var(--gold));
+  }
+  .bg-gold {
+    background-color: hsl(var(--gold));
+  }
+  .text-argentina {
+    color: hsl(var(--argentina-blue));
+  }
+  .border-argentina {
+    border-color: hsl(var(--argentina-blue) / 0.5);
+  }
+  /* Líneas de cancha sutiles para fondos */
+  .bg-pitch-stripes {
+    background-image: repeating-linear-gradient(
+      90deg,
+      hsl(var(--primary) / 0.04) 0 80px,
+      hsl(var(--primary) / 0.07) 80px 160px
+    );
+  }
+  .bg-pitch-stripes-dark {
+    background-image: repeating-linear-gradient(
+      90deg,
+      hsl(215 30% 8%) 0 80px,
+      hsl(215 30% 11%) 80px 160px
+    );
+  }
+}

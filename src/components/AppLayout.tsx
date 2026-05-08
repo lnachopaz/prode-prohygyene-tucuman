@@ -1,0 +1,106 @@
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Trophy, ListChecks, Shield, LogOut, Moon, Sun, User as UserIcon, LayoutDashboard } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TrophyLogo } from "@/components/TrophyLogo";
+import { useAuth, signOut } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
+import { cn } from "@/lib/utils";
+
+export default function AppLayout() {
+  const { isAdmin, user } = useAuth();
+  const { theme, toggle } = useTheme();
+  const navigate = useNavigate();
+
+  async function handleSignOut() {
+    await signOut();
+    navigate("/auth");
+  }
+
+  const navItem = (active: boolean) =>
+    cn(
+      "inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-heading uppercase tracking-wide text-[13px] transition-colors",
+      active
+        ? "bg-primary text-primary-foreground shadow-sm"
+        : "text-muted-foreground hover:text-foreground hover:bg-muted",
+    );
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="border-b border-border/70 bg-card/95 backdrop-blur sticky top-0 z-40 shadow-sm">
+        {/* Franja superior dorada */}
+        <div className="h-[3px] w-full bg-gradient-to-r from-gold via-gold/70 to-gold" />
+
+        <div className="container flex h-20 items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <TrophyLogo size="md" showWordmark />
+          </div>
+
+          <nav className="hidden md:flex items-center gap-1">
+            <NavLink to="/" end className={({ isActive }) => navItem(isActive)}>
+              <LayoutDashboard className="h-4 w-4" /> Resumen
+            </NavLink>
+            <NavLink to="/predictions" className={({ isActive }) => navItem(isActive)}>
+              <ListChecks className="h-4 w-4" /> Pronósticos
+            </NavLink>
+            <NavLink to="/ranking" className={({ isActive }) => navItem(isActive)}>
+              <Trophy className="h-4 w-4" /> Ranking
+            </NavLink>
+            <NavLink to="/profile" className={({ isActive }) => navItem(isActive)}>
+              <UserIcon className="h-4 w-4" /> Perfil
+            </NavLink>
+            {isAdmin && (
+              <NavLink to="/admin" className={({ isActive }) => navItem(isActive)}>
+                <Shield className="h-4 w-4" /> Admin
+              </NavLink>
+            )}
+          </nav>
+
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={toggle} aria-label="Cambiar tema">
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            {user && (
+              <Button variant="ghost" size="icon" onClick={handleSignOut} aria-label="Cerrar sesión">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile nav */}
+        <nav className="md:hidden border-t flex justify-around py-2">
+          <NavLink to="/" end className={({ isActive }) => navItem(isActive)}>
+            <LayoutDashboard className="h-4 w-4" />
+          </NavLink>
+          <NavLink to="/predictions" className={({ isActive }) => navItem(isActive)}>
+            <ListChecks className="h-4 w-4" />
+          </NavLink>
+          <NavLink to="/ranking" className={({ isActive }) => navItem(isActive)}>
+            <Trophy className="h-4 w-4" />
+          </NavLink>
+          <NavLink to="/profile" className={({ isActive }) => navItem(isActive)}>
+            <UserIcon className="h-4 w-4" />
+          </NavLink>
+          {isAdmin && (
+            <NavLink to="/admin" className={({ isActive }) => navItem(isActive)}>
+              <Shield className="h-4 w-4" />
+            </NavLink>
+          )}
+        </nav>
+      </header>
+
+      <main className="flex-1 container py-6">
+        <Outlet />
+      </main>
+
+      <footer className="border-t bg-card/40">
+        <div className="container py-5 flex flex-col items-center gap-2">
+          <TrophyLogo size="sm" />
+          <p className="text-xs text-muted-foreground text-center font-heading uppercase tracking-[0.2em]">
+            Prode Mundial 2026 · Prohygiene Tucumán
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
