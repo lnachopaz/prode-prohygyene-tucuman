@@ -4,10 +4,10 @@ import logoSrc from "@/assets/logo-grande.png";
 type Size = "sm" | "md" | "lg" | "xl";
 
 const sizes: Record<Size, string> = {
-  sm: "h-9 w-9",
-  md: "h-12 w-12",
-  lg: "h-20 w-20",
-  xl: "h-28 w-28",
+  sm: "h-9 w-auto",
+  md: "h-12 w-auto",
+  lg: "h-20 w-auto",
+  xl: "h-28 w-auto",
 };
 
 const wordmark: Record<Size, { main: string; sub: string }> = {
@@ -33,7 +33,7 @@ export function TrophyLogo({
       <img
         src={logoSrc}
         alt="Prohygiene Tucumán"
-        className={cn(s, "rounded-full object-cover ring-2 ring-argentina/40 shadow-md")}
+        className={cn(s, "object-contain")}
       />
       {showWordmark && (
         <div className="flex flex-col leading-none">
@@ -55,7 +55,7 @@ export function TrophyMark({ className }: { className?: string }) {
     <img
       src={logoSrc}
       alt="Prohygiene Tucumán"
-      className={cn("rounded-full object-cover", className)}
+      className={cn("object-contain", className)}
     />
   );
 }
