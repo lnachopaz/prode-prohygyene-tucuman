@@ -25,6 +25,23 @@
 
   <body>
     <div id="root"></div>
+    <!-- Prevents Vite HMR from reloading the page when the browser reconnects
+         the WebSocket after the tab was in the background. -->
+    <script>
+      (function () {
+        var real = location.reload.bind(location);
+        document.addEventListener('visibilitychange', function () {
+          if (document.hidden) return;
+          // Block any reload() call for 5 s after the tab becomes visible.
+          // Vite fires its reconnect-reload within ~1-2 s of regaining focus.
+          var exp = Date.now() + 5000;
+          try {
+            location.reload = function () { if (Date.now() > exp) real(); };
+            setTimeout(function () { location.reload = real; }, 5000);
+          } catch (e) {}
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
