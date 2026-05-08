@@ -12,8 +12,8 @@ dist
 dist-ssr
 *.local
 
-# Environment variables
-.env
+# Variables de entorno con secretos (service_role key, etc.)
+# .env con claves públicas de Supabase (anon key) se commitea para Lovable
 .env.local
 .env.*.local
 
