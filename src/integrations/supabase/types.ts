@@ -90,6 +90,7 @@ export type Database = {
           id: string
           kickoff_at: string
           multiplier_override: number | null
+          point_multiplier: number
           prediction_window_id: string | null
           predictions_lock_mode: Database["public"]["Enums"]["lock_mode"]
           score_a: number | null
@@ -98,8 +99,10 @@ export type Database = {
           status: Database["public"]["Enums"]["match_status"]
           team_a: string
           team_a_flag: string | null
+          team_a_multiplier: number
           team_b: string
           team_b_flag: string | null
+          team_b_multiplier: number
           team_multiplier_override: Json | null
           test_mode: boolean
           updated_at: string
@@ -113,6 +116,7 @@ export type Database = {
           id?: string
           kickoff_at: string
           multiplier_override?: number | null
+          point_multiplier?: number
           prediction_window_id?: string | null
           predictions_lock_mode?: Database["public"]["Enums"]["lock_mode"]
           score_a?: number | null
@@ -121,8 +125,10 @@ export type Database = {
           status?: Database["public"]["Enums"]["match_status"]
           team_a: string
           team_a_flag?: string | null
+          team_a_multiplier?: number
           team_b: string
           team_b_flag?: string | null
+          team_b_multiplier?: number
           team_multiplier_override?: Json | null
           test_mode?: boolean
           updated_at?: string
@@ -136,6 +142,7 @@ export type Database = {
           id?: string
           kickoff_at?: string
           multiplier_override?: number | null
+          point_multiplier?: number
           prediction_window_id?: string | null
           predictions_lock_mode?: Database["public"]["Enums"]["lock_mode"]
           score_a?: number | null
@@ -144,8 +151,10 @@ export type Database = {
           status?: Database["public"]["Enums"]["match_status"]
           team_a?: string
           team_a_flag?: string | null
+          team_a_multiplier?: number
           team_b?: string
           team_b_flag?: string | null
+          team_b_multiplier?: number
           team_multiplier_override?: Json | null
           test_mode?: boolean
           updated_at?: string
@@ -236,6 +245,7 @@ export type Database = {
           created_at: string
           display_name: string
           id: string
+          is_blocked: boolean
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
         }
@@ -244,6 +254,7 @@ export type Database = {
           created_at?: string
           display_name: string
           id: string
+          is_blocked?: boolean
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
         }
@@ -252,6 +263,7 @@ export type Database = {
           created_at?: string
           display_name?: string
           id?: string
+          is_blocked?: boolean
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
         }
@@ -373,6 +385,21 @@ export type Database = {
               stage: string
               team_a: string
               team_b: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              pa: number
+              pb: number
+              point_mult?: number
+              sa: number
+              sb: number
+              stage: string
+              team_a: string
+              team_a_mult?: number
+              team_b: string
+              team_b_mult?: number
             }
             Returns: number
           }
