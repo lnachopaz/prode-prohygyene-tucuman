@@ -141,6 +141,9 @@ function MedalIcon({ pos }: { pos: number }) {
 export default function Ranking() {
   const { user } = useAuth();
   const [filter, setFilter] = useState<StageKey>("all");
+  // Solo cargar todos los pronósticos cuando el usuario elige un filtro de fase.
+  // La vista "Todas" usa el leaderboard directamente (rápido).
+  const [predsEnabled, setPredsEnabled] = useState(false);
 
   const { data: leaderboard, isLoading: lLb } = useQuery({
     queryKey: ["ranking-leaderboard"],
@@ -160,6 +163,7 @@ export default function Ranking() {
   const { data: preds, isLoading: l1 } = useQuery({
     queryKey: ["ranking-preds-all"],
     staleTime: 2 * 60_000,
+    enabled: predsEnabled,
     queryFn: async () => {
       const rows = await fetchAllPaginated<PredRow>(() =>
         supabase
@@ -372,7 +376,7 @@ export default function Ranking() {
       )}
 
       {/* Filter */}
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as StageKey)}>
+      <Tabs value={filter} onValueChange={(v) => { setFilter(v as StageKey); if (v !== "all") setPredsEnabled(true); }}>
         <TabsList className="grid grid-cols-6 w-full">
           {(Object.keys(STAGE_LABEL) as StageKey[]).map((k) => (
             <TabsTrigger key={k} value={k} className="text-xs sm:text-sm">{STAGE_LABEL[k]}</TabsTrigger>
