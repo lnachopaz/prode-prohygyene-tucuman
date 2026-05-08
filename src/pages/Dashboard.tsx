@@ -20,6 +20,7 @@ export default function Dashboard() {
   const { data: stats } = useQuery({
     queryKey: ["dashboard-stats", user?.id],
     enabled: !!user,
+    staleTime: 2 * 60_000,
     queryFn: async () => {
       const [{ data: fullLb }, { data: matches }, { data: preds }] = await Promise.all([
         supabase
@@ -52,6 +53,7 @@ export default function Dashboard() {
 
   const { data: nextMatches } = useQuery({
     queryKey: ["dashboard-next-matches"],
+    staleTime: 30_000,
     queryFn: async () => {
       // Incluye partidos en vivo + próximos a arrancar (kickoff > ahora)
       const { data } = await supabase
@@ -73,6 +75,7 @@ export default function Dashboard() {
 
   const { data: topRanking } = useQuery({
     queryKey: ["dashboard-top-ranking"],
+    staleTime: 5 * 60_000,
     queryFn: async () => {
       const { data } = await supabase
         .from("leaderboard")
