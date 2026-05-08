@@ -15,16 +15,18 @@ export function useAuth() {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) {
-        setLoading(true);
-        setTimeout(() => {
-          loadAccess(s.user.id).finally(() => setLoading(false));
-        }, 0);
-      } else {
+      if (!s?.user) {
         setIsAdmin(false);
         setStatus(null);
         setLoading(false);
+        return;
       }
+      // Token renovado automáticamente: sesión sigue activa, no hay que re-verificar roles
+      if (_event === "TOKEN_REFRESHED") return;
+      setLoading(true);
+      setTimeout(() => {
+        loadAccess(s.user.id).finally(() => setLoading(false));
+      }, 0);
     });
 
     supabase.auth.getSession().then(async ({ data: { session: s } }) => {

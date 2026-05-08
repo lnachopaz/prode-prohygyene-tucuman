@@ -301,7 +301,8 @@ export default function Ranking() {
     return { players, totalPreds, totalExact, totalResult, leader: current[0] };
   }, [current]);
 
-  if (lLb || l1 || l2) {
+  // Solo bloquear con el leaderboard y perfiles (rápidos); las predicciones cargan en background
+  if (lLb || l2) {
     return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
 
@@ -395,7 +396,9 @@ export default function Ranking() {
           </div>
 
           <div className="divide-y">
-            {current.map((row, i) => {
+            {filter !== "all" && l1 ? (
+              <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : current.map((row, i) => {
               const isMe = row.user_id === user?.id;
               const pos = i + 1;
               const prevPos = previous.get(row.user_id);
@@ -480,7 +483,7 @@ export default function Ranking() {
               );
             })}
 
-            {current.length === 0 && (
+            {current.length === 0 && !l1 && (
               <div className="px-4 py-12 text-center text-muted-foreground text-sm">Aún no hay puntos en esta fase.</div>
             )}
           </div>
