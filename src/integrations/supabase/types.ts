@@ -89,7 +89,7 @@ export type Database = {
           group_name: string | null
           id: string
           kickoff_at: string
-          point_multiplier: number
+          multiplier_override: number | null
           prediction_window_id: string | null
           predictions_lock_mode: Database["public"]["Enums"]["lock_mode"]
           score_a: number | null
@@ -98,10 +98,9 @@ export type Database = {
           status: Database["public"]["Enums"]["match_status"]
           team_a: string
           team_a_flag: string | null
-          team_a_multiplier: number
           team_b: string
           team_b_flag: string | null
-          team_b_multiplier: number
+          team_multiplier_override: Json | null
           test_mode: boolean
           updated_at: string
           venue: string | null
@@ -113,7 +112,7 @@ export type Database = {
           group_name?: string | null
           id?: string
           kickoff_at: string
-          point_multiplier?: number
+          multiplier_override?: number | null
           prediction_window_id?: string | null
           predictions_lock_mode?: Database["public"]["Enums"]["lock_mode"]
           score_a?: number | null
@@ -122,10 +121,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["match_status"]
           team_a: string
           team_a_flag?: string | null
-          team_a_multiplier?: number
           team_b: string
           team_b_flag?: string | null
-          team_b_multiplier?: number
+          team_multiplier_override?: Json | null
           test_mode?: boolean
           updated_at?: string
           venue?: string | null
@@ -137,7 +135,7 @@ export type Database = {
           group_name?: string | null
           id?: string
           kickoff_at?: string
-          point_multiplier?: number
+          multiplier_override?: number | null
           prediction_window_id?: string | null
           predictions_lock_mode?: Database["public"]["Enums"]["lock_mode"]
           score_a?: number | null
@@ -146,10 +144,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["match_status"]
           team_a?: string
           team_a_flag?: string | null
-          team_a_multiplier?: number
           team_b?: string
           team_b_flag?: string | null
-          team_b_multiplier?: number
+          team_multiplier_override?: Json | null
           test_mode?: boolean
           updated_at?: string
           venue?: string | null
@@ -231,20 +228,6 @@ export type Database = {
             referencedRelation: "matches"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "predictions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "leaderboard"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "predictions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
         ]
       }
       profiles: {
@@ -253,8 +236,6 @@ export type Database = {
           created_at: string
           display_name: string
           id: string
-          is_blocked: boolean
-          show_in_ranking: boolean
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
         }
@@ -263,8 +244,6 @@ export type Database = {
           created_at?: string
           display_name: string
           id: string
-          is_blocked?: boolean
-          show_in_ranking?: boolean
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
         }
@@ -273,8 +252,6 @@ export type Database = {
           created_at?: string
           display_name?: string
           id?: string
-          is_blocked?: boolean
-          show_in_ranking?: boolean
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
         }
@@ -350,10 +327,42 @@ export type Database = {
       }
     }
     Functions: {
+      admin_delete_prediction: {
+        Args: { _prediction_id: string }
+        Returns: undefined
+      }
       calc_points: {
         Args: { pa: number; pb: number; sa: number; sb: number }
         Returns: number
       }
+      calc_points_full:
+        | {
+            Args: {
+              override: number
+              pa: number
+              pb: number
+              sa: number
+              sb: number
+              stage: string
+              team_a: string
+              team_b: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              override: number
+              pa: number
+              pb: number
+              sa: number
+              sb: number
+              stage: string
+              team_a: string
+              team_b: string
+              team_mult?: Json
+            }
+            Returns: number
+          }
       calc_points_match:
         | {
             Args: {
@@ -371,22 +380,16 @@ export type Database = {
             Args: {
               pa: number
               pb: number
-              point_mult?: number
               sa: number
               sb: number
               stage: string
               team_a: string
-              team_a_mult?: number
               team_b: string
-              team_b_mult?: number
+              team_mult?: Json
             }
             Returns: number
           }
       delete_user_completely: { Args: { _user_id: string }; Returns: undefined }
-      ensure_user_profile: {
-        Args: never
-        Returns: Database["public"]["Enums"]["user_status"]
-      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -413,10 +416,6 @@ export type Database = {
         }[]
       }
       recalc_match_points: { Args: { _match_id: string }; Returns: number }
-      set_user_blocked: {
-        Args: { _blocked: boolean; _user_id: string }
-        Returns: undefined
-      }
       set_user_status: {
         Args: {
           _status: Database["public"]["Enums"]["user_status"]
