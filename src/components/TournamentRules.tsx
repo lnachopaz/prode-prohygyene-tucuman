@@ -50,15 +50,16 @@ export function TournamentRules() {
               <li>• <Badge>x8</Badge> en la final del Mundial</li>
               <li>• <Badge>x4</Badge> en semifinales y partido por el 3° puesto</li>
               <li>• <Badge>x2</Badge> en cuartos de final</li>
-              <li>• Dieciseisavos y octavos: sin multiplicador de fase</li>
+              <li>• <Badge>x2</Badge> en octavos de final</li>
+              <li>• Dieciseisavos: sin multiplicador de fase</li>
             </ul>
             <div className="mt-2 rounded-md border bg-muted/40 p-2 text-xs space-y-1">
               <p className="font-medium text-foreground">Ejemplos:</p>
               <p>• Pleno en grupos: 3 × 1 = <strong>3 pts</strong></p>
-              <p>• Pleno en cuartos de final: 3 × 2 = <strong>6 pts</strong></p>
+              <p>• Pleno en octavos o cuartos: 3 × 2 = <strong>6 pts</strong></p>
               <p>• Pleno en cuartos con Argentina: 3 × 2 × 2 = <strong>12 pts</strong></p>
-              <p>• Pleno en semifinal con Argentina: 3 × 2 × 4 = <strong>24 pts</strong></p>
-              <p>• Pleno en la Final con Argentina: 3 × 2 × 8 = <strong>48 pts</strong></p>
+              <p>• Pleno en semifinal con Argentina: 3 × 4 × 2 = <strong>24 pts</strong></p>
+              <p>• Pleno en la Final con Argentina: 3 × 8 × 2 = <strong>48 pts</strong></p>
             </div>
           </div>
         </section>
@@ -76,13 +77,22 @@ export function TournamentRules() {
         </section>
 
         <section>
-          <h3 className="font-semibold flex items-center gap-2 mb-2">
+          <h3 className="font-semibold flex items-center gap-2 mb-3">
             <Gift className="h-4 w-4 text-primary" /> Premios
           </h3>
-          <p className="text-muted-foreground mb-1">Viaje a ver la final del mundial, en un hotel 5 estrellas</p>
-          <p className="text-muted-foreground mb-1 text-center font-semibold">o</p>
-          <p className="text-muted-foreground mb-2">Camiseta de la Selección Argentina.</p>
-          <p className="text-muted-foreground font-medium">Importante: El premio a entregar será elegido por el jefe, Luis Paz</p>
+          <div className="space-y-2">
+            <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5">
+              <p className="font-medium text-foreground text-sm">Viaje a ver la final del mundial</p>
+              <p className="text-xs text-muted-foreground">En un hotel 5 estrellas</p>
+            </div>
+            <p className="text-center text-xs font-semibold text-muted-foreground">— o —</p>
+            <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5">
+              <p className="font-medium text-foreground text-sm">Camiseta de la Selección Argentina</p>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground border-t pt-2">
+            <strong>Importante:</strong> El premio a entregar será elegido por el jefe, Luis Paz
+          </p>
         </section>
 
         <section>
