@@ -1,11 +1,12 @@
 /**
  * Multiplicadores del Prode 2026:
  * - x2 si juega Argentina
- * - x2 en la final del Mundial
- * - x1.5 en semifinales y 3° puesto
- * - x1.2 en octavos y cuartos de final
+ * - x8 en la final del Mundial
+ * - x4 en semifinales y 3° puesto
+ * - x2 en cuartos de final
+ * - x2 en octavos de final
  * - x1 en dieciseisavos (sin multiplicador)
- * Se acumulan: una final con Argentina = x4.
+ * Se acumulan: una final con Argentina = x16.
  */
 
 function isFinalStage(s: string): boolean {
@@ -62,10 +63,10 @@ export function getMatchMultiplier(
 
   if (ta.includes("argentina") || tb.includes("argentina")) mult *= 2;
 
-  if (isFinalStage(s)) mult *= 2;
-  else if (isSemiOrThirdStage(s)) mult *= 1.5;
-  else if (isQuarterStage(s)) mult *= 1.2;
-  else if (isRoundOf16Stage(s)) mult *= 1.2;
+  if (isFinalStage(s)) mult *= 8;
+  else if (isSemiOrThirdStage(s)) mult *= 4;
+  else if (isQuarterStage(s)) mult *= 2;
+  else if (isRoundOf16Stage(s)) mult *= 2;
 
   if (pointMult && pointMult !== 1) mult *= pointMult;
   if (teamAMult && teamAMult !== 1) mult *= teamAMult;
@@ -104,10 +105,10 @@ export function getMultiplierInfo(
   if (ta.includes("argentina") || tb.includes("argentina")) {
     reasons.push("Argentina"); parts.push({ label: "Argentina", mult: 2 });
   }
-  if (isFinalStage(s)) { reasons.push("Final"); parts.push({ label: "Final", mult: 2 }); }
-  else if (isSemiOrThirdStage(s)) { reasons.push("Semis/3° puesto"); parts.push({ label: "Semis", mult: 1.5 }); }
-  else if (isQuarterStage(s)) { reasons.push("Cuartos"); parts.push({ label: "Cuartos", mult: 1.2 }); }
-  else if (isRoundOf16Stage(s)) { reasons.push("Octavos"); parts.push({ label: "Octavos", mult: 1.2 }); }
+  if (isFinalStage(s)) { reasons.push("Final"); parts.push({ label: "Final", mult: 8 }); }
+  else if (isSemiOrThirdStage(s)) { reasons.push("Semis/3° puesto"); parts.push({ label: "Semis", mult: 4 }); }
+  else if (isQuarterStage(s)) { reasons.push("Cuartos"); parts.push({ label: "Cuartos", mult: 2 }); }
+  else if (isRoundOf16Stage(s)) { reasons.push("Octavos"); parts.push({ label: "Octavos", mult: 2 }); }
   if (pointMult && pointMult !== 1) { reasons.push(`x${pointMult}`); parts.push({ label: "Manual", mult: pointMult }); }
   if (teamAMult && teamAMult !== 1) { reasons.push(`${team_a} x${teamAMult}`); parts.push({ label: team_a ?? "A", mult: teamAMult }); }
   if (teamBMult && teamBMult !== 1) { reasons.push(`${team_b} x${teamBMult}`); parts.push({ label: team_b ?? "B", mult: teamBMult }); }
