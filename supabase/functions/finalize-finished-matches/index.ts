@@ -44,18 +44,35 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Partidos candidatos: kickoff hace ≥ 100min, status ≠ finished, sin test_mode, con external_id
-    const cutoffIso = new Date(Date.now() - 100 * 60 * 1000).toISOString();
-    const { data: candidates } = await admin
-      .from("matches")
-      .select("id, external_id, status")
-      .neq("status", "finished")
-      .eq("test_mode", false)
-      .lte("kickoff_at", cutoffIso)
-      .not("external_id", "is", null)
-      .limit(20);
+    const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    const forcedMatchId: string | null = body.match_id ?? null;
 
-    const matches = candidates ?? [];
+    let candidates: Array<{ id: string; external_id: string | null; status: string }> = [];
+
+    if (forcedMatchId) {
+      // Re-sincronización manual de un partido específico (ignora status finished)
+      const { data } = await admin
+        .from("matches")
+        .select("id, external_id, status")
+        .eq("id", forcedMatchId)
+        .not("external_id", "is", null)
+        .limit(1);
+      candidates = data ?? [];
+    } else {
+      // Partidos candidatos: kickoff hace ≥ 100min, status ≠ finished, sin test_mode, con external_id
+      const cutoffIso = new Date(Date.now() - 100 * 60 * 1000).toISOString();
+      const { data } = await admin
+        .from("matches")
+        .select("id, external_id, status")
+        .neq("status", "finished")
+        .eq("test_mode", false)
+        .lte("kickoff_at", cutoffIso)
+        .not("external_id", "is", null)
+        .limit(20);
+      candidates = data ?? [];
+    }
+
+    const matches = candidates;
     if (matches.length === 0) {
       await finishLog({ status: "success", updated_count: 0, details: { message: "no matches to finalize" } });
       return new Response(JSON.stringify({ updated: 0 }), {
@@ -90,17 +107,14 @@ Deno.serve(async (req) => {
             const score_a = (useReg ? reg?.home : ft?.home) ?? ft?.home ?? null;
             const score_b = (useReg ? reg?.away : ft?.away) ?? ft?.away ?? null;
 
-            const { error: upErr } = await admin
+            let q = admin
               .from("matches")
-              .update({
-                status: "finished",
-                score_a,
-                score_b,
-                updated_at: new Date().toISOString(),
-              })
+              .update({ status: "finished", score_a, score_b, updated_at: new Date().toISOString() })
               .eq("id", m.id)
-              .neq("status", "finished") // no pisar manuales
               .eq("test_mode", false);
+            // En modo automático no pisamos correcciones manuales; en re-sync forzado sí
+            if (!forcedMatchId) q = q.neq("status", "finished");
+            const { error: upErr } = await q;
             if (upErr) throw upErr;
             results.push({ id: m.id, ok: true, status: "finished", score: `${score_a ?? 0}-${score_b ?? 0}` });
           }

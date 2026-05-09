@@ -9,13 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Save, Plus, Trash2, Calculator, Lock, RotateCcw, Download } from "lucide-react";
+import { Loader2, Save, Plus, Trash2, Calculator, Lock, RotateCcw, Download, RefreshCw } from "lucide-react";
 import { formatAR, arLocalInputToUTC } from "@/lib/datetime";
 import { translateTeamName } from "@/lib/teamNames";
 import { formatGroupName } from "@/lib/groupNames";
 
 interface AdminMatch {
   id: string;
+  external_id: string | null;
   kickoff_at: string;
   stage: string;
   group_name: string | null;
@@ -176,6 +177,7 @@ function MatchAdminRow({ match, onChange }: { match: AdminMatch; onChange: () =>
   const [busy, setBusy] = useState(false);
   const [recalcBusy, setRecalcBusy] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
+  const [resyncBusy, setResyncBusy] = useState(false);
   const lockMode: "auto" | "force_open" | "force_closed" = match.predictions_lock_mode ?? "auto";
 
   async function save() {
@@ -209,6 +211,21 @@ function MatchAdminRow({ match, onChange }: { match: AdminMatch; onChange: () =>
     setRecalcBusy(false);
     if (error) return toast.error(error.message);
     toast.success(`Recalculadas ${data ?? 0} predicciones`);
+    onChange();
+  }
+
+  async function resync() {
+    if (!confirm(`¿Re-sincronizar resultado desde Football-Data?\nEsto pisará el marcador actual con el oficial.`)) return;
+    setResyncBusy(true);
+    const { data, error } = await supabase.functions.invoke("finalize-finished-matches", {
+      body: { match_id: match.id },
+    });
+    setResyncBusy(false);
+    if (error) return toast.error(error.message);
+    const r = data?.results?.[0];
+    if (!r) return toast.error("Sin respuesta del servidor");
+    if (!r.ok) return toast.error(r.error ?? "Error al re-sincronizar");
+    toast.success(`Resultado actualizado: ${r.score}`);
     onChange();
   }
 
@@ -276,6 +293,11 @@ function MatchAdminRow({ match, onChange }: { match: AdminMatch; onChange: () =>
             <Button size="sm" variant="outline" onClick={recalc} disabled={recalcBusy} title="Recalcular puntos">
               {recalcBusy ? <Loader2 className="h-4 w-4" /> : <Calculator className="h-4 w-4" />}
             </Button>
+            {match.external_id && (
+              <Button size="sm" variant="outline" onClick={resync} disabled={resyncBusy} title="Re-sincronizar resultado desde Football-Data (útil si el VAR cambió el marcador)">
+                {resyncBusy ? <Loader2 className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />}
+              </Button>
+            )}
             <Button size="sm" variant="ghost" onClick={restoreDefaults} title="Restaurar a configuración predeterminada">
               <RotateCcw className="h-4 w-4" />
             </Button>
