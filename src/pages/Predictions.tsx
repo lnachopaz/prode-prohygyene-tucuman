@@ -439,7 +439,9 @@ function MatchCard({
           {!locked && (
             <Button
               size="lg"
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+              className={prediction
+                ? "w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold"
+                : "w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"}
               onClick={handleSave}
               disabled={saving || windowNotYetOpen}
             >
