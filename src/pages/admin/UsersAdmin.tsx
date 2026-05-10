@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, MailCheck } from "lucide-react";
+import { Loader2, MailCheck, PlusCircle, MinusCircle } from "lucide-react";
 import { format } from "date-fns";
 
 interface AdminUser {
@@ -21,6 +21,7 @@ interface AdminUser {
   total_points: number;
   predictions_count: number;
   show_in_ranking: boolean;
+  bonus_points: number;
 }
 
 interface UserRowProps {
@@ -31,6 +32,7 @@ interface UserRowProps {
   onDelete: () => void;
   onBlock: () => void;
   onToggleRanking: (show: boolean) => void;
+  onAdjustPoints: (delta: number) => void;
 }
 
 export function UsersAdmin() {
@@ -110,6 +112,18 @@ export function UsersAdmin() {
     qc.invalidateQueries({ queryKey: ["admin-pending-detailed"] });
   }
 
+  async function adjustBonusPoints(userId: string, delta: number) {
+    const user = users?.find((u: any) => u.id === userId);
+    const current = (user as any)?.bonus_points ?? 0;
+    const newVal = current + delta;
+    const { error } = await supabase.from("profiles").update({ bonus_points: newVal }).eq("id", userId);
+    if (error) return toast.error(error.message);
+    toast.success(`${delta > 0 ? "+" : ""}${delta} pts aplicados a ${user?.display_name}`);
+    qc.invalidateQueries({ queryKey: ["admin-users"] });
+    qc.invalidateQueries({ queryKey: ["ranking-leaderboard"] });
+    qc.invalidateQueries({ queryKey: ["ranking-profiles"] });
+  }
+
   async function toggleRanking(userId: string, show: boolean) {
     const { error } = await supabase.from("profiles").update({ show_in_ranking: show }).eq("id", userId);
     if (error) return toast.error(error.message);
@@ -175,6 +189,7 @@ export function UsersAdmin() {
             onDelete={() => deleteUser(u.id, u.display_name)}
             onBlock={() => setBlocked(u.id, !u.is_blocked, u.display_name)}
             onToggleRanking={(show) => toggleRanking(u.id, show)}
+            onAdjustPoints={(delta) => adjustBonusPoints(u.id, delta)}
           />
         ))}
       </div>
@@ -182,8 +197,17 @@ export function UsersAdmin() {
   );
 }
 
-function UserRow({ user, onRename, onReject, onUnblock, onDelete, onBlock, onToggleRanking }: UserRowProps) {
+function UserRow({ user, onRename, onReject, onUnblock, onDelete, onBlock, onToggleRanking, onAdjustPoints }: UserRowProps) {
   const [name, setName] = useState(user.display_name);
+  const [pointDelta, setPointDelta] = useState("");
+
+  function applyDelta() {
+    const delta = parseInt(pointDelta);
+    if (isNaN(delta) || delta === 0) return;
+    onAdjustPoints(delta);
+    setPointDelta("");
+  }
+
   return (
     <Card className={user.is_blocked ? "border-destructive/50" : ""}>
       <CardContent className="p-3 space-y-2">
@@ -218,6 +242,33 @@ function UserRow({ user, onRename, onReject, onUnblock, onDelete, onBlock, onTog
             />
             <span>Visible en ranking</span>
           </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-t pt-2">
+          <span className="text-xs text-muted-foreground font-medium">Ajuste manual de puntos:</span>
+          {(user.bonus_points ?? 0) !== 0 && (
+            <Badge variant="outline" className={(user.bonus_points ?? 0) > 0 ? "text-green-600 border-green-400" : "text-red-600 border-red-400"}>
+              {(user.bonus_points ?? 0) > 0 ? `+${user.bonus_points}` : user.bonus_points} pts bonus
+            </Badge>
+          )}
+          <div className="flex items-center gap-1">
+            <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => { setPointDelta((v) => String((parseInt(v) || 0) - 1)); }}>
+              <MinusCircle className="h-3.5 w-3.5" />
+            </Button>
+            <Input
+              type="number"
+              className="w-20 h-7 text-xs text-center"
+              placeholder="0"
+              value={pointDelta}
+              onChange={(e) => setPointDelta(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && applyDelta()}
+            />
+            <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => { setPointDelta((v) => String((parseInt(v) || 0) + 1)); }}>
+              <PlusCircle className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <Button size="sm" className="h-7 text-xs" variant="outline" onClick={applyDelta} disabled={pointDelta === "" || parseInt(pointDelta) === 0}>
+            Aplicar
+          </Button>
         </div>
       </CardContent>
     </Card>
