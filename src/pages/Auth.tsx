@@ -122,7 +122,7 @@ export default function Auth() {
     if (!passwordValid) return toast.error("La contraseña no cumple los requisitos");
     if (!passwordsMatch) return toast.error("Las contraseñas no coinciden");
     setBusy(true);
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -132,14 +132,6 @@ export default function Auth() {
     });
     setBusy(false);
     if (error) return toast.error(error.message);
-
-    // Fire-and-forget admin notification
-    void supabase.functions
-      .invoke("notify-admin-new-user", {
-        body: { user_id: data.user?.id, display_name: name.trim(), email },
-      })
-      .catch((e) => console.warn("notify-admin-new-user failed", e));
-
     setPendingVerificationEmail(email);
     toast.success("Cuenta creada. Revisá tu email para verificarla.");
   }
