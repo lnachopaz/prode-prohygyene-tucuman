@@ -101,13 +101,6 @@ export function UsersAdmin() {
     toast.success(status === "approved" ? "Usuario aprobado" : status === "rejected" ? "Usuario rechazado" : "Marcado como pendiente");
     qc.invalidateQueries({ queryKey: ["admin-users"] });
     qc.invalidateQueries({ queryKey: ["admin-pending-detailed"] });
-    if (status === "approved") {
-      supabase.functions.invoke("send-approval-email", { body: { user_id: userId } })
-        .then(({ error: fnErr }) => {
-          if (fnErr) toast.error(`Email de bienvenida no enviado: ${fnErr.message}`);
-          else toast.success("Email de bienvenida enviado");
-        });
-    }
   }
 
   async function deleteUser(userId: string, displayName: string) {
