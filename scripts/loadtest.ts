@@ -18,7 +18,7 @@ const SUPABASE_ANON_KEY =
   process.env.SUPABASE_ANON_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuZ3NvemtvaWtyamFvenhqYnR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NjQ1OTksImV4cCI6MjA5MzA0MDU5OX0.71US49JsH16CIX1wtVAhCukn3D51GeOv9__eBfaJLKo";
 
-const CONCURRENCY = Math.min(Number(process.env.CONCURRENCY ?? 100), 100);
+const CONCURRENCY = Math.min(Number(process.env.CONCURRENCY ?? 100), 500);
 const DURATION_SEC = Number(process.env.DURATION_SEC ?? 60);
 const POLL_MS = Number(process.env.POLL_MS ?? 5000);
 const PASSWORD = "LoadTest123!";

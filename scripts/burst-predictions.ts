@@ -17,7 +17,7 @@ const SUPABASE_ANON_KEY =
   process.env.SUPABASE_ANON_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuZ3NvemtvaWtyamFvenhqYnR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NjQ1OTksImV4cCI6MjA5MzA0MDU5OX0.71US49JsH16CIX1wtVAhCukn3D51GeOv9__eBfaJLKo";
 
-const USERS = Math.min(Number(process.env.USERS ?? 50), 100);
+const USERS = Math.min(Number(process.env.USERS ?? 50), 500);
 const MATCHES_PER = Number(process.env.MATCHES_PER ?? 3);
 const PASSWORD = "LoadTest123!";
 
