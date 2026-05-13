@@ -139,12 +139,23 @@ export default function Auth() {
       body: {
         to: "prodefutbolpag@gmail.com",
         subject: `Nuevo usuario quiere ingresar: ${name.trim()}`,
-        html: `<p>Un nuevo usuario solicitó acceso al prode:</p>
-<ul>
-  <li><strong>Nombre:</strong> ${name.trim()}</li>
-  <li><strong>Email:</strong> ${email}</li>
-</ul>
-<p>Ingresá al panel de admin para aprobarlo o rechazarlo.</p>`,
+        html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+  <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:28px 24px;text-align:center;color:#ffffff">
+    <h1 style="margin:0;font-size:22px;font-weight:800;letter-spacing:.3px">Nuevo usuario solicitó acceso 👤</h1>
+    <p style="margin:8px 0 0;opacity:.95;font-size:14px">Prode Prohygyene Tucumán</p>
+  </div>
+  <div style="padding:28px 24px;color:#1f2937;font-size:15px;line-height:1.6">
+    <p style="margin:0 0 16px">Un nuevo usuario solicitó acceso al prode:</p>
+    <table style="width:100%;border-collapse:collapse;background:#f9fafb;border-radius:8px;overflow:hidden;margin:0 0 20px">
+      <tr><td style="padding:12px 16px;border-bottom:1px solid #e5e7eb;width:90px;color:#6b7280">Nombre</td><td style="padding:12px 16px;border-bottom:1px solid #e5e7eb;font-weight:600">${name.trim()}</td></tr>
+      <tr><td style="padding:12px 16px;color:#6b7280">Email</td><td style="padding:12px 16px;font-weight:600"><a href="mailto:${email}" style="color:#2563eb;text-decoration:none">${email}</a></td></tr>
+    </table>
+    <p style="margin:0 0 20px">Ingresá al panel de admin para aprobarlo o rechazarlo:</p>
+    <p style="text-align:center;margin:24px 0">
+      <a href="https://prode-prohygyene-tucuman.lovable.app/admin" style="display:inline-block;padding:14px 28px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px">Ir al panel de admin</a>
+    </p>
+  </div>
+</div>`,
       },
     }).catch((e) => console.error("admin notify failed", e));
   }
