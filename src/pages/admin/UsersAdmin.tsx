@@ -104,16 +104,26 @@ export function UsersAdmin() {
       const email = (target as any)?.email;
       const name = (target as any)?.display_name ?? "";
       if (email) {
-        const siteUrl = window.location.origin;
+        const authUrl = "https://prode-prohygyene-tucuman.lovable.app/auth";
         supabase.functions.invoke("send-gmail", {
           body: {
             to: email,
             subject: "¡Tu cuenta del Prode fue aprobada! 🎉",
-            html: `<p>Hola ${name},</p>
-<p>Tu cuenta en el <strong>Prode</strong> fue aprobada por un administrador.</p>
-<p>Ya podés ingresar a la página y empezar a cargar tus pronósticos:</p>
-<p><a href="${siteUrl}" style="display:inline-block;padding:10px 18px;background:#0a7d3a;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">Ingresar al Prode</a></p>
-<p>¡Mucha suerte!</p>`,
+            html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+  <div style="background:linear-gradient(135deg,#0a7d3a,#0e9648);padding:28px 24px;text-align:center;color:#ffffff">
+    <h1 style="margin:0;font-size:24px;font-weight:800;letter-spacing:.3px">¡Tu cuenta fue aprobada! 🎉</h1>
+    <p style="margin:8px 0 0;opacity:.95;font-size:14px">Prode Prohygyene Tucumán</p>
+  </div>
+  <div style="padding:28px 24px;color:#1f2937;font-size:15px;line-height:1.6">
+    <p style="margin:0 0 12px">Hola <strong>${name}</strong>,</p>
+    <p style="margin:0 0 12px">Tu cuenta en el <strong>Prode</strong> fue aprobada por un administrador.</p>
+    <p style="margin:0 0 20px">Ya podés ingresar a la página y empezar a cargar tus pronósticos:</p>
+    <p style="text-align:center;margin:24px 0">
+      <a href="${authUrl}" style="display:inline-block;padding:14px 28px;background:#0a7d3a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px">Ingresar al Prode</a>
+    </p>
+    <p style="margin:20px 0 0;color:#6b7280;font-size:14px">¡Mucha suerte! ⚽</p>
+  </div>
+</div>`,
           },
         }).catch((e) => console.error("approval mail failed", e));
       }
