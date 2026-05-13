@@ -119,9 +119,12 @@ export function UsersAdmin() {
     <p style="margin:0 0 12px">Hola <strong>${name}</strong>,</p>
     <p style="margin:0 0 12px">Tu cuenta en el <strong>Prode</strong> fue aprobada por un administrador.</p>
     <p style="margin:0 0 20px">Ya podés ingresar a la página y empezar a cargar tus pronósticos:</p>
-    <p style="text-align:center;margin:24px 0">
-      <a href="${authUrl}" style="display:inline-block;padding:14px 28px;background:#0a7d3a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px">Ingresar al Prode</a>
-    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:24px auto">
+      <tr><td align="center" bgcolor="#0a7d3a" style="background:#0a7d3a;border-radius:8px">
+        <a href="${authUrl}" target="_blank" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;font-family:Arial,sans-serif">Ingresar al Prode →</a>
+      </td></tr>
+    </table>
+    <p style="text-align:center;margin:8px 0 0;font-size:13px;color:#6b7280">o copiá este link: <a href="${authUrl}" style="color:#0a7d3a">prode-prohygyene-tucuman.lovable.app/auth</a></p>
     <p style="margin:20px 0 0;color:#6b7280;font-size:14px">¡Mucha suerte! ⚽</p>
   </div>
 </div>`,
