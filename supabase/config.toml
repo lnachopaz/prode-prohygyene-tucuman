@@ -1,1 +1,4 @@
 project_id = "cngsozkoikrjaozxjbtz"
+
+[functions.send-gmail]
+verify_jwt = false
