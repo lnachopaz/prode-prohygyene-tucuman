@@ -151,9 +151,12 @@ export default function Auth() {
       <tr><td style="padding:12px 16px;color:#6b7280">Email</td><td style="padding:12px 16px;font-weight:600"><a href="mailto:${email}" style="color:#2563eb;text-decoration:none">${email}</a></td></tr>
     </table>
     <p style="margin:0 0 20px">Ingresá al panel de admin para aprobarlo o rechazarlo:</p>
-    <p style="text-align:center;margin:24px 0">
-      <a href="https://prode-prohygyene-tucuman.lovable.app/admin" style="display:inline-block;padding:14px 28px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px">Ir al panel de admin</a>
-    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:24px auto">
+      <tr><td align="center" bgcolor="#2563eb" style="background:#2563eb;border-radius:8px">
+        <a href="https://prode-prohygyene-tucuman.lovable.app/admin" target="_blank" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;font-family:Arial,sans-serif">Ir al panel de admin →</a>
+      </td></tr>
+    </table>
+    <p style="text-align:center;margin:8px 0 0;font-size:13px;color:#6b7280">o copiá este link: <a href="https://prode-prohygyene-tucuman.lovable.app/admin" style="color:#2563eb">prode-prohygyene-tucuman.lovable.app/admin</a></p>
   </div>
 </div>`,
       },
