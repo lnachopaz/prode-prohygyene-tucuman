@@ -134,6 +134,19 @@ export default function Auth() {
     if (error) return toast.error(error.message);
     setPendingVerificationEmail(email);
     toast.success("Cuenta creada. Revisá tu email para verificarla.");
+    // Notificar al admin (no bloqueante)
+    supabase.functions.invoke("send-gmail", {
+      body: {
+        to: "prodefutbolpag@gmail.com",
+        subject: `Nuevo usuario quiere ingresar: ${name.trim()}`,
+        html: `<p>Un nuevo usuario solicitó acceso al prode:</p>
+<ul>
+  <li><strong>Nombre:</strong> ${name.trim()}</li>
+  <li><strong>Email:</strong> ${email}</li>
+</ul>
+<p>Ingresá al panel de admin para aprobarlo o rechazarlo.</p>`,
+      },
+    }).catch((e) => console.error("admin notify failed", e));
   }
 
   if (recoveryMode) {
