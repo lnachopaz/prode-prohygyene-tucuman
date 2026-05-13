@@ -105,11 +105,12 @@ export function UsersAdmin() {
       const name = (target as any)?.display_name ?? "";
       if (email) {
         const authUrl = "https://prode-prohygyene-tucuman.lovable.app/auth";
-        supabase.functions.invoke("send-gmail", {
-          body: {
-            to: email,
-            subject: "¡Tu cuenta del Prode fue aprobada! 🎉",
-            html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+        try {
+          const { data, error } = await supabase.functions.invoke("send-gmail", {
+            body: {
+              to: email,
+              subject: "¡Tu cuenta del Prode fue aprobada! 🎉",
+              html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
   <div style="background:linear-gradient(135deg,#0a7d3a,#0e9648);padding:28px 24px;text-align:center;color:#ffffff">
     <h1 style="margin:0;font-size:24px;font-weight:800;letter-spacing:.3px">¡Tu cuenta fue aprobada! 🎉</h1>
     <p style="margin:8px 0 0;opacity:.95;font-size:14px">Prode Prohygyene Tucumán</p>
@@ -124,8 +125,20 @@ export function UsersAdmin() {
     <p style="margin:20px 0 0;color:#6b7280;font-size:14px">¡Mucha suerte! ⚽</p>
   </div>
 </div>`,
-          },
-        }).catch((e) => console.error("approval mail failed", e));
+            },
+          });
+          if (error || (data && (data as any).success === false)) {
+            console.error("approval mail failed", error, data);
+            toast.error("Usuario aprobado, pero falló el envío del mail: " + (error?.message ?? (data as any)?.error ?? "error desconocido"));
+          } else {
+            toast.success("Mail de aprobación enviado a " + email);
+          }
+        } catch (e: any) {
+          console.error("approval mail exception", e);
+          toast.error("Usuario aprobado, pero el mail no se envió: " + (e?.message ?? "error"));
+        }
+      } else {
+        toast.error("No se encontró el email del usuario para notificarle.");
       }
     }
     qc.invalidateQueries({ queryKey: ["admin-users"] });
