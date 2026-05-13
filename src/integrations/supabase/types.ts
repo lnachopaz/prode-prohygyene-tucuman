@@ -247,6 +247,7 @@ export type Database = {
           display_name: string
           id: string
           is_blocked: boolean
+          show_in_ranking: boolean
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
         }
@@ -257,6 +258,7 @@ export type Database = {
           display_name: string
           id: string
           is_blocked?: boolean
+          show_in_ranking?: boolean
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
         }
@@ -267,6 +269,7 @@ export type Database = {
           display_name?: string
           id?: string
           is_blocked?: boolean
+          show_in_ranking?: boolean
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
         }
@@ -420,6 +423,10 @@ export type Database = {
             Returns: number
           }
       delete_user_completely: { Args: { _user_id: string }; Returns: undefined }
+      ensure_user_profile: {
+        Args: never
+        Returns: Database["public"]["Enums"]["user_status"]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -446,6 +453,10 @@ export type Database = {
         }[]
       }
       recalc_match_points: { Args: { _match_id: string }; Returns: number }
+      set_user_blocked: {
+        Args: { _blocked: boolean; _user_id: string }
+        Returns: undefined
+      }
       set_user_status: {
         Args: {
           _status: Database["public"]["Enums"]["user_status"]

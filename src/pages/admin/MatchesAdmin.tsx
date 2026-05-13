@@ -185,7 +185,7 @@ function MatchAdminRow({ match, onChange }: { match: AdminMatch; onChange: () =>
     const { error } = await supabase.from("matches").update({
       score_a: sa === "" ? null : parseInt(sa, 10),
       score_b: sb === "" ? null : parseInt(sb, 10),
-      status,
+      status: status as "finished" | "live" | "scheduled",
       stage: stageEdit || null,
       point_multiplier: parseFloat(pointMult) || 1,
       team_a_multiplier: parseFloat(teamAMult) || 1,
