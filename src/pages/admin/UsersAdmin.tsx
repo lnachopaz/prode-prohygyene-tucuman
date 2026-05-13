@@ -99,6 +99,25 @@ export function UsersAdmin() {
     const { error } = await supabase.rpc("set_user_status", { _user_id: userId, _status: status });
     if (error) return toast.error(error.message);
     toast.success(status === "approved" ? "Usuario aprobado" : status === "rejected" ? "Usuario rechazado" : "Marcado como pendiente");
+    if (status === "approved") {
+      const target = users?.find((u: any) => u.id === userId) ?? pendingDetailed?.find((u: any) => u.id === userId);
+      const email = (target as any)?.email;
+      const name = (target as any)?.display_name ?? "";
+      if (email) {
+        const siteUrl = window.location.origin;
+        supabase.functions.invoke("send-gmail", {
+          body: {
+            to: email,
+            subject: "¡Tu cuenta del Prode fue aprobada! 🎉",
+            html: `<p>Hola ${name},</p>
+<p>Tu cuenta en el <strong>Prode</strong> fue aprobada por un administrador.</p>
+<p>Ya podés ingresar a la página y empezar a cargar tus pronósticos:</p>
+<p><a href="${siteUrl}" style="display:inline-block;padding:10px 18px;background:#0a7d3a;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">Ingresar al Prode</a></p>
+<p>¡Mucha suerte!</p>`,
+          },
+        }).catch((e) => console.error("approval mail failed", e));
+      }
+    }
     qc.invalidateQueries({ queryKey: ["admin-users"] });
     qc.invalidateQueries({ queryKey: ["admin-pending-detailed"] });
   }
