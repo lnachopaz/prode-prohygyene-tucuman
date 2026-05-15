@@ -390,7 +390,7 @@ export default function Auth() {
             </CardHeader>
             <CardContent>
               <TabsContent value="login" className="space-y-4 mt-0">
-                <CardTitle className="text-lg">Volver a entrar</CardTitle>
+                <CardTitle className="text-lg">Ingresar Sesión a Prode PH Tucumán</CardTitle>
                 <CardDescription>Usá tu email y contraseña.</CardDescription>
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">

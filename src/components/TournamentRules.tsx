@@ -20,10 +20,7 @@ export function TournamentRules() {
             Las fases se desbloquean progresivamente:
           </p>
           <ul className="space-y-1 text-muted-foreground">
-            <li>• <strong>Fecha 1</strong> (fase de grupos): ya disponible</li>
-            <li>• <strong>Fecha 2</strong> (fase de grupos): a partir del 11/06</li>
-            <li>• <strong>Fecha 3</strong> (fase de grupos): a partir del 18/06</li>
-            <li>• <strong>Dieciseisavos de final</strong>: a partir del 24/06</li>
+            <li>• <strong>Partidos de Fase de Grupos</strong>: <span className="text-green-600 font-semibold">¡Ya Disponible!</span></li>
             <li>• <strong>Octavos de final</strong>: a partir del 28/06</li>
             <li>• <strong>Cuartos de final</strong>: a partir del 04/07</li>
             <li>• <strong>Semifinales</strong>: a partir del 09/07</li>
