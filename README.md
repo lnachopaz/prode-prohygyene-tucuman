@@ -1,4 +1,4 @@
-# ⚽ Prode Prohygiene Tucumán
+# Prode Prohygiene Tucumán
 
 Plataforma web de predicción de resultados deportivos desarrollada para los empleados de **Prohygiene S.A.**, Tucumán.
 
@@ -17,12 +17,12 @@ Permite a los participantes predecir resultados de partidos de fútbol, acumular
 
 ## Funcionalidades
 
-- 🔐 Registro e inicio de sesión por usuario
-- ⚽ Fixture de partidos con fechas y equipos
-- 🎯 Sistema de predicción de resultados por partido
-- 🏆 Puntuación automática al cierre de cada fecha
-- 📊 Ranking en tiempo real con posiciones actualizadas
-- 📱 Diseño responsive para uso desde el celular
+- Registro e inicio de sesión por usuario
+- Fixture de partidos con fechas y equipos
+- Sistema de predicción de resultados por partido
+- Puntuación automática al cierre de cada fecha
+- Ranking en tiempo real con posiciones actualizadas
+- Diseño responsive para uso desde el celular
 
 ## Estructura del proyecto
 
@@ -38,7 +38,7 @@ prode-prohygyene-tucuman/
 
 ## Estado
 
-✅ En producción · +527 commits
+En producción
 
 ---
 
