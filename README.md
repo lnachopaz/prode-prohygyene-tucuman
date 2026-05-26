@@ -34,12 +34,6 @@ prode-prohygyene-tucuman/
 ├── supabase/      # Migraciones y configuración de base de datos
 ├── scripts/       # Scripts utilitarios
 └── .env.example   # Variables de entorno necesarias
-```
-
-## Estado
-
-En producción
-
 ---
 
 Desarrollado por [Luis Ignacio Paz](https://www.linkedin.com/in/luisignaciopaz-ing)
