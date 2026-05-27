@@ -13,7 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save, Lock, X, Pencil, Sparkles, Calendar, ChevronUp, ChevronDown } from "lucide-react";
+import { Loader2, Save, Lock, X, Pencil, Sparkles, Calendar, ChevronUp, ChevronDown, LayoutGrid } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MatchDetailsDialog } from "@/components/MatchDetailsDialog";
 import { toast } from "sonner";
 import { format, isAfter, subHours, formatDistanceStrict } from "date-fns";
@@ -59,6 +60,18 @@ type Prediction = {
   pred_a: number;
   pred_b: number;
   points: number | string;
+};
+
+type TeamStat = {
+  team: string;
+  flag: string | null;
+  pj: number;
+  g: number;
+  e: number;
+  p: number;
+  gf: number;
+  gc: number;
+  pts: number;
 };
 
 export default function Predictions() {
@@ -113,6 +126,44 @@ export default function Predictions() {
     preds?.forEach((p) => m.set(p.match_id, p));
     return m;
   }, [preds]);
+
+  const groupStandings = useMemo(() => {
+    if (!matches) return new Map<string, TeamStat[]>();
+    const groupMatches = matches.filter((m) => m.group_name !== null);
+    const groups = new Map<string, Map<string, TeamStat>>();
+    groupMatches.forEach((m) => {
+      if (!m.group_name) return;
+      if (!groups.has(m.group_name)) groups.set(m.group_name, new Map());
+      const g = groups.get(m.group_name)!;
+      if (!g.has(m.team_a)) g.set(m.team_a, { team: m.team_a, flag: m.team_a_flag, pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0, pts: 0 });
+      if (!g.has(m.team_b)) g.set(m.team_b, { team: m.team_b, flag: m.team_b_flag, pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0, pts: 0 });
+    });
+    groupMatches.forEach((m) => {
+      const pred = predMap.get(m.id);
+      if (!pred) return;
+      const g = groups.get(m.group_name!)!;
+      const a = g.get(m.team_a)!;
+      const b = g.get(m.team_b)!;
+      a.pj++; b.pj++;
+      a.gf += pred.pred_a; a.gc += pred.pred_b;
+      b.gf += pred.pred_b; b.gc += pred.pred_a;
+      if (pred.pred_a > pred.pred_b) { a.g++; a.pts += 3; b.p++; }
+      else if (pred.pred_a < pred.pred_b) { b.g++; b.pts += 3; a.p++; }
+      else { a.e++; a.pts++; b.e++; b.pts++; }
+    });
+    const result = new Map<string, TeamStat[]>();
+    groups.forEach((teamMap, groupName) => {
+      const teams = Array.from(teamMap.values()).sort((x, y) => {
+        if (y.pts !== x.pts) return y.pts - x.pts;
+        const dx = x.gf - x.gc, dy = y.gf - y.gc;
+        if (dy !== dx) return dy - dx;
+        if (y.gf !== x.gf) return y.gf - x.gf;
+        return x.team.localeCompare(y.team);
+      });
+      result.set(groupName, teams);
+    });
+    return result;
+  }, [matches, predMap]);
 
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [groupFilter, setGroupFilter] = useState<string>("all");
@@ -201,94 +252,212 @@ export default function Predictions() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Pronósticos</h1>
         <p className="text-muted-foreground">Cargá tus marcadores hasta 1 hora antes de cada partido.</p>
       </div>
 
+      <Tabs defaultValue="predictions" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="predictions">Pronósticos</TabsTrigger>
+          <TabsTrigger value="standings" className="gap-1.5">
+            <LayoutGrid className="h-4 w-4" /> Tabla de Grupos
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="flex flex-wrap gap-2 items-center">
-        <Select value={stageFilter} onValueChange={setStageFilter}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Etapa" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las etapas</SelectItem>
-            {stages.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <TabsContent value="predictions" className="space-y-6 mt-0">
+          <div className="flex flex-wrap gap-2 items-center">
+            <Select value={stageFilter} onValueChange={setStageFilter}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="Etapa" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las etapas</SelectItem>
+                {stages.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
 
-        <Select value={groupFilter} onValueChange={setGroupFilter}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Grupo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los grupos</SelectItem>
-            {groups.map((g) => <SelectItem key={g} value={g}>{formatGroupName(g)}</SelectItem>)}
-          </SelectContent>
-        </Select>
+            <Select value={groupFilter} onValueChange={setGroupFilter}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Grupo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los grupos</SelectItem>
+                {groups.map((g) => <SelectItem key={g} value={g}>{formatGroupName(g)}</SelectItem>)}
+              </SelectContent>
+            </Select>
 
-        <Select value={predStatusFilter} onValueChange={setPredStatusFilter}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Estado" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="loaded">Pronóstico cargado</SelectItem>
-            <SelectItem value="missing">Sin pronóstico</SelectItem>
-            <SelectItem value="open">Abiertos</SelectItem>
-            <SelectItem value="locked">Cerrados</SelectItem>
-            <SelectItem value="finished">Finalizados</SelectItem>
-          </SelectContent>
-        </Select>
+            <Select value={predStatusFilter} onValueChange={setPredStatusFilter}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="Estado" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value="loaded">Pronóstico cargado</SelectItem>
+                <SelectItem value="missing">Sin pronóstico</SelectItem>
+                <SelectItem value="open">Abiertos</SelectItem>
+                <SelectItem value="locked">Cerrados</SelectItem>
+                <SelectItem value="finished">Finalizados</SelectItem>
+              </SelectContent>
+            </Select>
 
-        <Input
-          placeholder="Buscar equipo..."
-          value={teamFilter}
-          onChange={(e) => setTeamFilter(e.target.value)}
-          className="w-[200px]"
-        />
+            <Input
+              placeholder="Buscar equipo..."
+              value={teamFilter}
+              onChange={(e) => setTeamFilter(e.target.value)}
+              className="w-[200px]"
+            />
 
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={clearFilters}>
-            <X className="h-4 w-4 mr-1" /> Limpiar
-          </Button>
-        )}
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <X className="h-4 w-4 mr-1" /> Limpiar
+              </Button>
+            )}
 
-        <span className="text-sm text-muted-foreground ml-auto">
-          {filtered.length} {filtered.length === 1 ? "partido" : "partidos"}
-        </span>
-      </div>
+            <span className="text-sm text-muted-foreground ml-auto">
+              {filtered.length} {filtered.length === 1 ? "partido" : "partidos"}
+            </span>
+          </div>
 
-      {grouped.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          No hay partidos que coincidan con los filtros.
-        </div>
-      ) : (
-        grouped.map(([date, dayMatches]) => (
-          <section key={date} className="space-y-3">
-            <h2 className="text-lg font-semibold capitalize text-muted-foreground">
-              {(() => {
-                const [y, mo, d] = date.split("-").map(Number);
-                return format(new Date(y, mo - 1, d, 12), "EEEE d 'de' MMMM yyyy", { locale: es });
-              })()}
-            </h2>
-            <div className="grid gap-3 md:grid-cols-2">
-              {dayMatches.map((m) => {
-                const matchWithFlags = {
-                  ...m,
-                  team_a_flag: getCountryFlagUrl(m.team_a) ?? getClubCrestUrl(m.team_a) ?? m.team_a_flag,
-                  team_b_flag: getCountryFlagUrl(m.team_b) ?? getClubCrestUrl(m.team_b) ?? m.team_b_flag,
-                };
-                return (
-                  <MatchCard
-                    key={m.id}
-                    match={matchWithFlags}
-                    window={m.prediction_window_id ? windowMap.get(m.prediction_window_id) : undefined}
-                    prediction={predMap.get(m.id)}
-                    onSaved={() => qc.invalidateQueries({ queryKey: ["my-preds"] })}
-                  />
-                );
-              })}
+          {grouped.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No hay partidos que coincidan con los filtros.
             </div>
-          </section>
-        ))
-      )}
+          ) : (
+            grouped.map(([date, dayMatches]) => (
+              <section key={date} className="space-y-3">
+                <h2 className="text-lg font-semibold capitalize text-muted-foreground">
+                  {(() => {
+                    const [y, mo, d] = date.split("-").map(Number);
+                    return format(new Date(y, mo - 1, d, 12), "EEEE d 'de' MMMM yyyy", { locale: es });
+                  })()}
+                </h2>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {dayMatches.map((m) => {
+                    const matchWithFlags = {
+                      ...m,
+                      team_a_flag: getCountryFlagUrl(m.team_a) ?? getClubCrestUrl(m.team_a) ?? m.team_a_flag,
+                      team_b_flag: getCountryFlagUrl(m.team_b) ?? getClubCrestUrl(m.team_b) ?? m.team_b_flag,
+                    };
+                    return (
+                      <MatchCard
+                        key={m.id}
+                        match={matchWithFlags}
+                        window={m.prediction_window_id ? windowMap.get(m.prediction_window_id) : undefined}
+                        prediction={predMap.get(m.id)}
+                        onSaved={() => qc.invalidateQueries({ queryKey: ["my-preds"] })}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="standings" className="mt-0">
+          <GroupStandingsSection standings={groupStandings} matches={matches ?? []} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function GroupStandingsSection({
+  standings,
+  matches,
+}: {
+  standings: Map<string, TeamStat[]>;
+  matches: Match[];
+}) {
+  const sortedGroups = Array.from(standings.keys()).sort();
+
+  const totalByGroup = useMemo(() => {
+    const counts = new Map<string, number>();
+    matches.filter((m) => m.group_name).forEach((m) => {
+      counts.set(m.group_name!, (counts.get(m.group_name!) ?? 0) + 1);
+    });
+    return counts;
+  }, [matches]);
+
+  if (sortedGroups.length === 0) {
+    return (
+      <p className="text-center text-muted-foreground py-12">
+        No hay partidos de grupos disponibles aún.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Posiciones calculadas según tus pronósticos. Solo se cuentan los partidos donde ya cargaste un resultado.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {sortedGroups.map((groupName) => {
+          const teams = standings.get(groupName)!;
+          const total = totalByGroup.get(groupName) ?? 0;
+          const predicted = Math.round(teams.reduce((s, t) => s + t.pj, 0) / 2);
+          return (
+            <Card key={groupName} className="overflow-hidden">
+              <div className="bg-primary/10 px-3 py-2 flex items-center justify-between border-b">
+                <span className="font-bold text-sm text-primary">{formatGroupName(groupName)}</span>
+                <span className="text-[11px] text-muted-foreground">{predicted}/{total} pred.</span>
+              </div>
+              <CardContent className="p-0">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-[10px] text-muted-foreground border-b">
+                      <th className="py-1.5 pl-3 text-left w-5">#</th>
+                      <th className="py-1.5 pl-1.5 text-left">Equipo</th>
+                      <th className="py-1.5 text-center w-7">PJ</th>
+                      <th className="py-1.5 text-center w-6">G</th>
+                      <th className="py-1.5 text-center w-6">E</th>
+                      <th className="py-1.5 text-center w-6">P</th>
+                      <th className="py-1.5 text-center w-9">DIF</th>
+                      <th className="py-1.5 pr-3 text-center w-8 font-bold text-foreground">PTS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teams.map((team, idx) => {
+                      const flag = getCountryFlagUrl(team.team) ?? getClubCrestUrl(team.team) ?? team.flag;
+                      const dif = team.gf - team.gc;
+                      const isArg = isArgentina(translateTeamName(team.team));
+                      return (
+                        <tr
+                          key={team.team}
+                          className={[
+                            "border-b last:border-0",
+                            idx < 2 ? "bg-primary/5" : "",
+                            isArg ? "bg-amber-50 dark:bg-amber-950/20" : "",
+                          ].filter(Boolean).join(" ")}
+                        >
+                          <td className="py-1.5 pl-3 text-muted-foreground font-semibold">{idx + 1}</td>
+                          <td className="py-1.5 pl-1.5">
+                            <div className="flex items-center gap-1.5">
+                              {flag ? (
+                                <img src={flag} alt={team.team} className="h-4 w-4 rounded-full object-cover ring-1 ring-border shrink-0" />
+                              ) : (
+                                <div className="h-4 w-4 rounded-full bg-muted ring-1 ring-border shrink-0" />
+                              )}
+                              <span className={`truncate max-w-[70px] font-medium ${isArg ? "text-argentina" : ""}`}>
+                                {translateTeamName(team.team)}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-1.5 text-center text-muted-foreground">{team.pj}</td>
+                          <td className="py-1.5 text-center text-muted-foreground">{team.g}</td>
+                          <td className="py-1.5 text-center text-muted-foreground">{team.e}</td>
+                          <td className="py-1.5 text-center text-muted-foreground">{team.p}</td>
+                          <td className={`py-1.5 text-center font-medium ${dif > 0 ? "text-green-600 dark:text-green-400" : dif < 0 ? "text-red-500" : "text-muted-foreground"}`}>
+                            {dif > 0 ? `+${dif}` : dif}
+                          </td>
+                          <td className="py-1.5 pr-3 text-center font-bold">{team.pts}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
